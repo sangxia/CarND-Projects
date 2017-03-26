@@ -99,7 +99,7 @@ I found that accuracy can vary by as much as 0.01 for the same architecture if w
 Here are five German traffic signs that I found on the web:
 
 ![Round Pedestrain][image1] ![Pedestrain, unusual angle][image2] 
-![Unseen class][image3] ![End of no passing] [image4]
+![Unseen class][image3] ![End of no passing][image4]
 ![Weight limit][image5]
 
 Finding traffic sign photos of a given class seems to be the most challenging task in this project. I collected images from classes where the model did not do well, or images that are non-standard, in order to see what the model would do in these circumstances.
