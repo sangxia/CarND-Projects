@@ -18,6 +18,7 @@ def read_images(filenames, shape=(80,320,3)):
     for i,f in enumerate(filenames):
         buf = mpimg.imread(f)
         ret[i] = buf[55:135,:,:]
+        ret[i] = (ret[i]-np.mean(ret[i]))/np.std(ret[i])
     return ret
 
 def image_generator(Xnames, y, batch_size=128, use_shuffle=True):
@@ -75,8 +76,9 @@ print(df['steering'].describe())
 
 print('Building model')
 input_layer = Input(shape=(80,320,3))
-centered_input_layer = Lambda(lambda x: x/127.5-1., output_shape=(80,320,3))(input_layer)
-conv1 = conv_block(centered_input_layer, 3, 16)
+#centered_input_layer = Lambda(lambda x: x/127.5-1., output_shape=(80,320,3))(input_layer)
+#conv1 = conv_block(centered_input_layer, 3, 16)
+conv1 = conv_block(input_layer, 3, 16)
 conv2 = conv_block(conv1, 5, 32)
 conv3 = conv_block(conv2, 5, 64)
 flatten = Flatten()(conv3)
