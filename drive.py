@@ -71,10 +71,9 @@ def telemetry(sid, data):
         except Exception as e:
             print(str(e))
 
-        steering_angle *= 0.12
+        steering_angle *= 0.13
 
-        # throttle = controller.update(float(speed))
-        if float(speed)>15:
+        if float(speed)>16:
             throttle = 0
         else:
             throttle = 0.9

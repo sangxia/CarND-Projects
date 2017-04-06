@@ -96,7 +96,7 @@ if not is_relative:
 
 mult_factor = 10.
 dropout_rate = 0.5
-reg_rate = 1e-7
+reg_rate = 1e-6
 lr = 1e-3
 lr_decay_rate = 0.8
 side_init = 0.05
@@ -176,7 +176,7 @@ valid_generators = [image_generator(X_valid, np.zeros((len(X_valid),)), y_valid*
         use_shuffle=False, use_hflip=False) for X_valid,y_valid in zip(Xs_valid,ys_valid)]
 valid_steps_per_epoch = [np.ceil(len(X_valid)/valid_batch_size).astype(int) for X_valid in zip(Xs_valid)]
 
-schedule = [5] * 8
+schedule = [5] * 10
 tot = 0
 for nb_epochs in schedule:
     opt = Adam(lr = lr)
