@@ -9,6 +9,11 @@ The goals / steps of this project are the following:
 * Test that the model successfully drives around track one without leaving the road
 * Summarize the results with a written report
 
+[dist1]: ./s1.png "Steering Angle Distribution of Track One"
+[dist2]: ./s2.png "Steering Angle Distribution of Track Two"
+[sample1]: ./t1.png "Sample Images and Steering Angle from Track One"
+[sample2]: ./t2.png "Sample Images and Steering Angle from Track Two"
+
 ## Summary of Project Files
 
 My project includes the following files:
@@ -26,6 +31,14 @@ My project includes the following files:
 I recorded two laps in each direction on each track driving normally (center of the road/lane, smooth in the corner). Due to the complexity of track two, I drove at a much lower velocity, and changed lanes somewhat frequently. 
 
 I collected a total of 14167x3 images coming from all cameras. As I discuss below, I used the left and right camera images in order to teach the model to recover from sub-optimal positions, and that proved to be sufficient.
+
+![Steering Angle Distribution 1][dist1]
+![Steering Angle Distribution 2][dist2]
+
+The charts above show the distribution of the steering angle on the two tracks. Since the images are collected by driving on both directions, the steering angles are well balanced. It is also not surprising to see that there are more large values on track two than track one.
+
+![Sample Images Track 1][sample1]
+![Sample Images Track 2][sample2]
 
 The original images are of dimension 160x320x3. Before feeding them into my model, I cropped them vertically to 80x320x3 to a smaller region of interest in order to help the model focus on the important parts of the images, and also to speed up training. After that, for each image, I centered the image by subtracting the mean and dividing by the standard deviation of the pixels, and clipped the results into range [-10,10].
 
