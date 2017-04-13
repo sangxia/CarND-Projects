@@ -28,8 +28,9 @@ def sobel_magnitude(sx, sy, wx=1, wy=1):
     return np.sqrt(wx*sx**2+wy*sy**2)
 
 def sobel_magnitude_thresh(sx, sy, wx=1, wy=1, thresh=(0.3,1)):
+    height_middle = int(sx.shape[0]/2)
     mag = sobel_magnitude(sx, sy, wx, wy)
-    mag = mag/np.max(mag)
+    mag = mag/np.max(mag[height_middle:,:]) # only consider lower half
     ret = np.zeros_like(mag)
     ret[(mag>=thresh[0]) & (mag<=thresh[1])] = 1
     return ret
@@ -51,17 +52,26 @@ def binary_lane_threshold(img_ud):
     sobel_x = abs_sobel(gray, orient='x')
     sobel_y = abs_sobel(gray, orient='y')
     sobel_rel_mag = sobel_magnitude_thresh(\
-            sobel_x, sobel_y, wy=0, thresh=(0.05,1))
+            sobel_x, sobel_y, wy=0.05, thresh=(0.1,1))
     # sobel highlights boundaries, use filter2D to expand to neighboring pixels
     sobel_rel_mag = np.clip(cv2.filter2D(sobel_rel_mag,-1,np.ones((7,7))),0,1)
+
+    # filter out certain directions
+    sobel_dir = sobel_direction_thresh(sobel_x, sobel_y, \
+            thresh=(np.pi/2.5, np.pi/2))
+
     s_channel = hls[:,:,2]
-    s_channel = (s_channel > 160)
-    res = 255*(s_channel*sobel_rel_mag).astype(np.uint8)
+    s_channel = sobel_magnitude_thresh(\
+            abs_sobel(s_channel, orient='x', sobel_kernel=5), \
+            abs_sobel(s_channel, orient='y', sobel_kernel=5), \
+            wy=0.1, thresh=(0.02,1))
+    s_channel = np.clip(cv2.filter2D(s_channel,-1,np.ones((7,7))),0,1)
+    res = 255*(s_channel*sobel_rel_mag*(1-sobel_dir)).astype(np.uint8)
     return res
 
 def get_perspective_matrix():
     """ returns the perspective transform matrix and its inverse """
-    pp_src = np.array([(200,720-36),(1120,720-36),(580,720-268),(705,720-268)]).astype(np.float32)
+    pp_src = np.array([(200,684),(1120,684),(590,452),(695,452)]).astype(np.float32)
     pp_dst = np.array([(320,720),(960,720),(320,0),(960,0)]).astype(np.float32)
     pp_mtx = cv2.getPerspectiveTransform(pp_src, pp_dst)
     pp_mtx_inv = cv2.getPerspectiveTransform(pp_dst, pp_src)
@@ -78,7 +88,7 @@ def find_window_centroids(warped, window_width, window_height, margin):
     window = np.ones(window_width) 
     # Define pixel count threshold for level estimate
     # Windows with count lower than this are excluded
-    mask_thresh = window_height*0.3*255
+    mask_thresh = window_height*5*255
     # Define Fractional height and threshold of the initial estimate
     init_frac = 1/4
     init_thresh = warped.shape[0]*init_frac / window_height * mask_thresh
@@ -133,21 +143,36 @@ def find_window_centroids(warped, window_width, window_height, margin):
 
     return window_centroids
 
-def pixel_in_windows(img, window_centroids, window_width, window_height):
+def pixel_in_windows(img, window_centroids, window_width, window_height, sample_ratio = 0.2):
     """ 
     img has value either 0 or 255 
-    returns array of points that are identified as lanes
+    returns array of points that are identified as lanes, sampled by level
     """
     offset = window_width / 2
     level = img.shape[0]
-    ret = np.zeros_like(img)
+    resultx, resulty = None, None
     for c in window_centroids:
         if c:
             y_min = int(c-offset)
             y_max = int(c+offset)
-            ret[level-window_height:level,y_min:y_max] = img[level-window_height:level,y_min:y_max]
+            x_min = level-window_height
+            x_max = level
+            retx, rety = np.where(img[x_min:x_max,y_min:y_max]==255)
+            if retx.shape[0]>0:
+                # prob = min(sample_size / retx.shape[0], 1)
+                prob = sample_ratio
+                sample_prob = (np.random.random(retx.shape[0])<=prob)
+                retx, rety = retx[sample_prob], rety[sample_prob]
+                if retx.shape[0] > 0:
+                    retx += x_min
+                    rety += y_min
+                    if resultx is not None:
+                        resultx = np.hstack([resultx, retx])
+                        resulty = np.hstack([resulty, rety])
+                    else:
+                        resultx, resulty = retx, rety
         level -= window_height
-    return np.where(ret == 255)
+    return resultx, resulty
 
 def draw_lanes(\
         img_ud, \
@@ -169,7 +194,8 @@ def draw_lanes(\
     and the left, right and averaged curvature, as well as the relative 
     distance to lane center (negative if left to center, pos if right)
 
-    if either lane is not found, returns None
+    if either lane is not found, returns the original image and None for 
+    the values
     """
     # fit the polynomial for left and right lanes
     lx, ly = pixel_in_windows(warped, \
@@ -177,7 +203,7 @@ def draw_lanes(\
     rx, ry = pixel_in_windows(warped, \
             [v for u,v in window_centroids], window_width, window_height)
     if lx.shape[0]==0 or rx.shape[0]==0:
-        return None
+        return img_ud, None, None, None, None
     pl = np.polyfit(lx, ly, 2)
     pr = np.polyfit(rx, ry, 2)
     pts_y = np.arange(0, warped.shape[0], 1)

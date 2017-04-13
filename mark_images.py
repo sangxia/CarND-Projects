@@ -6,7 +6,7 @@ import glob
 import marklane
 
 def process_image(f, dist_info, pp_mtx, pp_mtx_inv, \
-        window_width=50, window_height=80, margin=60):
+        window_width=50, window_height=50, margin=50):
     img = cv2.imread(f)
     img_ud = marklane.undistort(img, dist_info)
     binary = marklane.binary_lane_threshold(img_ud)
