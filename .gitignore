@@ -1,3 +1,4 @@
 .ipynb_checkpoints/
 examples/
 __pycache__/
+*.swp
