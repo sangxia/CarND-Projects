@@ -263,6 +263,6 @@ def fit_warped(\
     cv2.polylines(output, \
             [np.vstack([linely,linex]).T.reshape(-1,1,2).astype(np.int32), \
             np.vstack([linery,linex]).T.reshape(-1,1,2).astype(np.int32)], \
-            False, (255,0,0), 10)
+            False, (0,0,255), 10)
     return output
 
