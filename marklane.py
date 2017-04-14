@@ -120,14 +120,15 @@ def find_window_centroids(warped, window_width, window_height, margin):
                 int(warped.shape[0]-level*window_height-warped.shape[0]*init_frac):int(warped.shape[0]-level*window_height), :], axis=0)
         conv_signal = np.convolve(window, image_layer)
         init_conv_signal = np.convolve(window, init_layer)
-        
         # try to find where the lane is going next
         level_delta, level_delta_score = 0., 0.
         if l_center:
+            # continue from previous slice
             l_min_index = np.clip(l_center+offset-margin+delta, 0, warped.shape[1]).astype(np.int)
             l_max_index = np.clip(l_center+offset+margin+delta, 0, warped.shape[1]).astype(np.int)
             conv_ptr = conv_signal
         else:
+            # try to find the first slice
             l_min_index = int(warped.shape[1]*0.15)
             l_max_index = int(warped.shape[1]*0.45)
             conv_ptr = init_conv_signal
@@ -136,9 +137,11 @@ def find_window_centroids(warped, window_width, window_height, margin):
             l_center_new = l_center_new.astype(np.int)
             l_center_offset = min(l_center_new+offset, warped.shape[1]).astype(np.int)
             if conv_ptr[l_center_offset] < mask_thresh:
+                # no candidate found
                 l_center_new = None
             else:
                 if l_center:
+                    # update candidate direction if possible
                     level_delta += (l_center_new - l_center) * ((conv_ptr[l_center_offset]/255)**2)
                     level_delta_score += (conv_ptr[l_center_offset]/255)**2
         if r_center:
@@ -162,18 +165,19 @@ def find_window_centroids(warped, window_width, window_height, margin):
         delta, delta_score = (delta*delta_score*old_weight + \
                               level_delta*new_weight)/(delta_score*old_weight+level_delta_score*new_weight), \
                              delta_score*old_weight+level_delta_score*new_weight
-        
         # now check if windows at the new delta direction are good
         if l_center:
+            # can only use direction if there is a previous window
             l_center_offset = np.clip(l_center+delta+offset, 0, warped.shape[1]).astype(np.int)
             if conv_signal[l_center_offset] >= mask_thresh:
                 l_center_new = int(l_center+delta)
             else:
                 l_center_new = None
+            # move along the lane regardless whether we found lane pixels
             l_center = int(l_center+delta)
         else:
+            # if there is no previously detected window, then update with whatever we found
             l_center = l_center_new
-        
         if r_center:
             r_center_offset = np.clip(r_center+delta+offset, 0, warped.shape[1]).astype(np.int)
             if -conv_signal[r_center_offset] >= mask_thresh:
@@ -186,40 +190,6 @@ def find_window_centroids(warped, window_width, window_height, margin):
         window_centroids.append((l_center_new, r_center_new))
 
     return window_centroids
-
-def pixel_in_windows(img, window_centroids, window_width, window_height, \
-        sample = 20):
-    """ 
-    img has value either 0 or 255 
-    returns array of points that are identified as lanes, sampled by level
-
-    no longer needed in the latest implementation
-    """
-    offset = window_width / 2
-    level = img.shape[0]
-    resultx, resulty = None, None
-    for c in window_centroids:
-        if c:
-            y_min = int(c-offset)
-            y_max = int(c+offset)
-            x_min = level-window_height
-            x_max = level
-            retx, rety = np.where(img[x_min:x_max,y_min:y_max]==255)
-            if retx.shape[0]>0:
-                prob = min(sample / retx.shape[0], 1)
-                # prob = sample_ratio
-                sample_prob = (np.random.random(retx.shape[0])<=prob)
-                retx, rety = retx[sample_prob], rety[sample_prob]
-                if retx.shape[0] > 0:
-                    retx += x_min
-                    rety += y_min
-                    if resultx is not None:
-                        resultx = np.hstack([resultx, retx])
-                        resulty = np.hstack([resulty, rety])
-                    else:
-                        resultx, resulty = retx, rety
-        level -= window_height
-    return resultx, resulty
 
 def fit_lane_centroids(\
         warped, \
@@ -265,7 +235,6 @@ def fit_lane_centroids(\
         elif window_centroids[level][0] and diff_mean:
             frx.append(x_center)
             fry.append(window_centroids[level][0]-diff_mean)
-    # fit polynomial
     lx, ly = np.array(lx), np.array(ly)
     rx, ry = np.array(rx), np.array(ry)
     flx, fly = np.array(flx), np.array(fly)
@@ -274,7 +243,86 @@ def fit_lane_centroids(\
     fry += int(window_width/4)
     return lx, ly, rx, ry, flx, fly, frx, fry
 
-def draw_lanes(img_ud, flx, fly, frx, fry, pp_mtx_inv, annotate=True):
+def sim_ratio(x, y, thresh=0.1):
+    """ returns whether each entry of y deviates less than thresh from x """
+    return np.alltrue(np.abs(x-y) < np.abs(x)*thresh)
+
+def fit_lane_poly(\
+        warped, \
+        window_width, \
+        window_height, \
+        flx, fly, frx, fry, \
+        hist_coeff, hist_score, \
+        update_rate=0.2):
+    """
+    warped - the warped image, used to calculate score for the new prediction
+    flx, fly, frx, fry - coordinates of lane centroids
+    hist_coeff - coefficients of previous lane prediction
+                 the first two are the coefficients for the quadratic and
+                 linear term, the third is the constant term for left, the last
+                 is the constant term for right 
+                 coefficients are in pixel space
+    hist_score - score weighted by the number of pixels in a prediction, 0 if 
+                 this is the first prediction
+
+    return the new hist_coeff and hist_score
+    """
+    # fit new polynomial if there is enough data
+    # invert the x (vertical) coordinate so the nearer side has smaller value
+    # this makes it easier to estimate lane width
+    if flx.shape[0]:
+        pl = np.polyfit(warped.shape[0]-flx, fly, 2)
+    else:
+        pl = None
+    if fry.shape[0]:
+        pr = np.polyfit(warped.shape[0]-frx, fry, 2)
+    else:
+        pr = None
+    left_count = 0
+    right_count = 0
+    offset = window_width/2
+    for level in range(0,(int)(warped.shape[0]/window_height)):
+        x_top = warped.shape[0]-level*window_height
+        if pl is not None:
+            y = np.polyval(pl, warped.shape[0]-x_top)
+            left_count += np.sum(warped[int(x_top):int(x_top+window_height), \
+                    int(y-offset):int(y+offset)])/255
+        if pr is not None:
+            y = np.polyval(pr, warped.shape[0]-x_top)
+            right_count += np.sum(warped[int(x_top):int(x_top+window_height), \
+                    int(y-offset):int(y+offset)])/255
+    hist_lane_diff = (hist_coeff[-1]-hist_coeff[-2]) if hist_score>=1 \
+            else 600.
+    tolerance = 0.15 if hist_score>=1 else 0.5
+    if pl is not None and pr is not None:
+        # sanity check: lane width should not change too much
+        lane_diff = pr[-1]-pl[-1]
+        if abs(lane_diff-hist_lane_diff) > tolerance*hist_lane_diff:
+            # something is wrong, reject the lanes that jumps around too much
+            if abs(pl[-1]-hist_coeff[-2]) > tolerance*hist_lane_diff:
+                left_count = 0
+            if abs(pr[-1]-hist_coeff[-1]) > tolerance*hist_lane_diff:
+                right_count = 0
+    if left_count == 0:
+        pl = np.zeros(3)
+    if right_count == 0:
+        pr = np.zeros(3)
+    left_count = left_count**2
+    right_count = right_count**2
+    # print(pl, left_count, pr, right_count)
+    Z = (1-update_rate)*hist_score + update_rate*(left_count + right_count)
+    new_coeff = ((1-update_rate)*hist_score*hist_coeff[:2] + \
+            update_rate*(left_count*pl[:2] + right_count*pr[:2])) / Z
+    cl = ((1-update_rate)*hist_score*hist_coeff[2] + \
+            update_rate*left_count*pl[-1]) / \
+            ((1-update_rate)*hist_score + update_rate*left_count)
+    cr = ((1-update_rate)*hist_score*hist_coeff[3] + \
+            update_rate*right_count*pr[-1]) / \
+            ((1-update_rate)*hist_score + update_rate*right_count)
+    # print(new_coeff, cl, cr, Z)
+    return np.hstack([new_coeff,[cl,cr]]), Z
+
+def draw_lanes(img_ud, coeff, pp_mtx_inv, annotate=True):
     """
     img_ud - undistorted image on which lanes will be marked
     pp_mtx_inv - the inverse perspective transform matrix
@@ -284,16 +332,14 @@ def draw_lanes(img_ud, flx, fly, frx, fry, pp_mtx_inv, annotate=True):
     if the input centroids are not sufficient, returns the original
     image and None for statistics
     """
-    if flx.shape[0]==0 or frx.shape[0]==0:
-        return img_ud, None, None, None, None
-    pl = np.polyfit(flx, fly, 2)
-    pr = np.polyfit(frx, fry, 2)
+    pl = coeff[:3]
+    pr = np.hstack([coeff[:2],[coeff[-1]]])
     pts_y = np.arange(0, img_ud.shape[0], 1)
     pts_lx = pl[0]*pts_y**2 + pl[1]*pts_y + pl[2]
     pts_rx = pr[0]*pts_y**2 + pr[1]*pts_y + pr[2]
     # Recast the x and y points into usable format for cv2.fillPoly()
-    pts_left = np.array([np.transpose(np.vstack([pts_lx, pts_y]))])
-    pts_right = np.array([np.flipud(np.transpose(np.vstack([pts_rx, pts_y])))])
+    pts_left = np.array([np.transpose(np.vstack([pts_lx, img_ud.shape[0]-pts_y]))])
+    pts_right = np.array([np.flipud(np.transpose(np.vstack([pts_rx, img_ud.shape[0]-pts_y])))])
     pts = np.hstack((pts_left, pts_right))
     # Draw the lane onto a newly created warped blank image
     warp_zero = np.zeros_like(img_ud[:,:,0]).astype(np.uint8)
@@ -308,10 +354,13 @@ def draw_lanes(img_ud, flx, fly, frx, fry, pp_mtx_inv, annotate=True):
     # now compute distance and curvature
     xm_per_pix = 30/720 # meters per pixel vertically
     ym_per_pix = 3.7/700 # meters per pixel horizontally
-    x_eval = 720
+    x_eval = 0
+    fx = np.arange(0, img_ud.shape[0], img_ud.shape[0]/5)
+    fly = np.polyval(pl, fx)
+    fry = np.polyval(pr, fx)
     # Fit new polynomials to x,y in world space
-    left_fit_cr = np.polyfit(flx*xm_per_pix, fly*ym_per_pix, 2)
-    right_fit_cr = np.polyfit(frx*xm_per_pix, fry*ym_per_pix, 2)
+    left_fit_cr = np.polyfit(fx*xm_per_pix, fly*ym_per_pix, 2)
+    right_fit_cr = np.polyfit(fx*xm_per_pix, fry*ym_per_pix, 2)
     # Calculate the new radii of curvature
     left_curverad = ((1 + (2*left_fit_cr[0]*x_eval*xm_per_pix + left_fit_cr[1])**2)**1.5) / np.absolute(2*left_fit_cr[0])
     right_curverad = ((1 + (2*right_fit_cr[0]*x_eval*xm_per_pix + right_fit_cr[1])**2)**1.5) / np.absolute(2*right_fit_cr[0])
@@ -346,7 +395,7 @@ def fit_warped(\
         window_centroids, \
         window_width, \
         window_height, \
-        lx, ly, rx, ry, flx, fly, frx, fry):
+        lx, ly, rx, ry, coeff):
     result = np.zeros_like(warped)
     for level in range(0,len(window_centroids)):
         if window_centroids[level][0]:
@@ -361,16 +410,14 @@ def fit_warped(\
     # making the original road pixels 3 color channels
     warpage = np.array(cv2.merge((warped,warped,warped)),np.uint8) 
     output = cv2.addWeighted(warpage, 1, result, 0.5, 0.0) # overlay the orignal road image with window results
-    if lx.shape[0]==0 or rx.shape[0]==0:
-        return output
-    pl = np.polyfit(flx, fly, 2)
-    pr = np.polyfit(frx, fry, 2)
-    linex = np.arange(0,720,10)
+    pl = coeff[:3]
+    pr = np.hstack([coeff[:2],[coeff[-1]]])
+    linex = np.arange(0,warped.shape[0],10)
     linely = np.polyval(pl, linex)
     linery = np.polyval(pr, linex)
     cv2.polylines(output, \
-            [np.vstack([linely,linex]).T.reshape(-1,1,2).astype(np.int32), \
-            np.vstack([linery,linex]).T.reshape(-1,1,2).astype(np.int32)], \
+            [np.vstack([linely,warped.shape[0]-linex]).T.reshape(-1,1,2).astype(np.int32), \
+            np.vstack([linery,warped.shape[0]-linex]).T.reshape(-1,1,2).astype(np.int32)], \
             False, (0,0,255), 10)
     return output
 
