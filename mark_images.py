@@ -6,7 +6,7 @@ import glob
 import marklane
 
 def process_image(f, dist_info, pp_mtx, pp_mtx_inv, \
-        window_width=150, window_height=50, margin=80):
+        window_width=150, window_height=50, margin=150):
     img = cv2.imread(f)
     img_ud = marklane.undistort(img, dist_info)
     binary = marklane.binary_lane_threshold(img_ud)
@@ -34,8 +34,8 @@ path_in = 'video_images/'
 path_out = 'output_video_images/'
 #path_in = 'test_images/'
 #path_out = 'output_images/'
-images = glob.glob(path_in + '*')
-images = ['video_images/challenge_video_0.jpg']
+#images = glob.glob(path_in + '*')
+images = ['video_images/harder_challenge_video_7.jpg']
 for f in images:
     print('processing ', f)
     ud, bn, wp, wf, out = process_image(f, dist_info, pp_mtx, pp_mtx_inv)
