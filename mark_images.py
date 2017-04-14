@@ -6,15 +6,18 @@ import glob
 import marklane
 
 def process_image(f, dist_info, pp_mtx, pp_mtx_inv, \
-        window_width=50, window_height=50, margin=50):
+        window_width=150, window_height=50, margin=80):
     img = cv2.imread(f)
     img_ud = marklane.undistort(img, dist_info)
     binary = marklane.binary_lane_threshold(img_ud)
     warped = marklane.warp_img(binary, pp_mtx)
     centroids = marklane.find_window_centroids(warped, window_width, window_height, margin)
-    warped_fit = marklane.fit_warped(warped, centroids, window_width, window_height)
-    result = marklane.draw_lanes(img_ud, warped, centroids, window_width, window_height, \
-            pp_mtx_inv)
+    lx, ly, rx, ry, flx, fly, frx, fry = \
+            marklane.fit_lane_centroids(warped, centroids, window_width, window_height)
+    warped_fit = marklane.fit_warped(\
+            warped, centroids, window_width, window_height, \
+            lx, ly, rx, ry, flx, fly, frx, fry)
+    result = marklane.draw_lanes(img_ud, flx, fly, frx, fry, pp_mtx_inv)
     return img_ud, \
             np.dstack([binary,binary,binary]), \
             np.dstack([warped,warped,warped]), \
