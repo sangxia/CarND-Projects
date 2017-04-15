@@ -30,12 +30,12 @@ with open('distort_calibration.pickle', 'rb') as f:
 
 pp_mtx, pp_mtx_inv = marklane.get_perspective_matrix()
 
-path_in = 'video_images/'
-path_out = 'output_video_images/'
-#path_in = 'test_images/'
-#path_out = 'output_images/'
-#images = glob.glob(path_in + '*')
-images = ['video_images/harder_challenge_video_7.jpg']
+#path_in = 'video_images/'
+#path_out = 'output_video_images/'
+#images = ['video_images/harder_challenge_video_7.jpg']
+path_in = 'test_images/'
+path_out = 'output_images/'
+images = glob.glob(path_in + '*')
 for f in images:
     print('processing ', f)
     ud, bn, wp, wf, out = process_image(f, dist_info, pp_mtx, pp_mtx_inv)

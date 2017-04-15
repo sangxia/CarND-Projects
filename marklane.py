@@ -14,7 +14,7 @@ def undistort(img, dist_info):
             dist_info['mtx'])
 
 def abs_sobel(img, orient='x', sobel_kernel=9):
-    """ img should already be grayscale """
+    """ img should be grayscale """
     ret = np.absolute(cv2.Sobel(\
             img, \
             cv2.CV_64F, \
@@ -60,13 +60,12 @@ def binary_lane_threshold(img_ud):
     # sobel highlights boundaries, use filter2D to expand to neighboring pixels
     sobel_rel_mag = np.clip(cv2.filter2D(sobel_rel_mag.astype(np.float64),\
             -1,np.ones((9,9))),0,1)
-
     # filter out certain directions
     sobel_dir = sobel_direction_thresh(sobel_x, sobel_y, \
             thresh=(np.pi/2.5, np.pi/2))
     sobel_dir = cv2.GaussianBlur(1-sobel_dir, (13,13), 0)
     sobel_dir = (sobel_dir>0.7)
-
+    # process S channel similarly as red channel
     s_channel = sobel_magnitude_thresh(\
             abs_sobel(s_channel, orient='x', sobel_kernel=5), \
             abs_sobel(s_channel, orient='y', sobel_kernel=5), \
@@ -205,7 +204,6 @@ def fit_lane_centroids(\
     windows (found and predicted) that can be used to fit polynomials
     and plot windows
     """
-
     # first estimate lane width in terms of pixels
     lx, ly, rx, ry = [], [], [], [] # centroids that are detected
     flx, fly, frx, fry = [], [], [], [] # centroids that are fitted
@@ -216,7 +214,7 @@ def fit_lane_centroids(\
     diff_mean = None
     if diffs:
         diff_mean = np.mean(diffs)
-    # now add the windows as well as the predicted windows
+    # now add the windows as well as the predicted windows using lane width est.
     for level in range(0,(int)(warped.shape[0]/window_height)):
         x_center = warped.shape[0]-(level+0.5)*window_height
         if window_centroids[level][0]:
@@ -235,12 +233,13 @@ def fit_lane_centroids(\
         elif window_centroids[level][0] and diff_mean:
             frx.append(x_center)
             fry.append(window_centroids[level][0]-diff_mean)
+    # convert everything to np array and adjust
     lx, ly = np.array(lx), np.array(ly)
     rx, ry = np.array(rx), np.array(ry)
     flx, fly = np.array(flx), np.array(fly)
     frx, fry = np.array(frx), np.array(fry)
     fly -= int(window_width/4)
-    fry += int(window_width/4)
+    fry += int(window_width/3)
     return lx, ly, rx, ry, flx, fly, frx, fry
 
 def sim_ratio(x, y, thresh=0.1):
@@ -274,23 +273,23 @@ def fit_lane_poly(\
 
     return the new hist_coeff and hist_score
     """
-    # fit new polynomial if there is enough data
-    # invert the x (vertical) coordinate so the nearer side has smaller value
-    # this makes it easier to estimate lane width
-
     if hist_score > 0:
         curv = curvature(hist_coeff[0], hist_coeff[1])
     else:
         curv = None
-
-    if flx.shape[0]:
+    # fit new polynomial if there is enough data
+    # invert the x (vertical) coordinate so the nearer side has smaller value
+    # this makes it easier to estimate lane width
+    if flx.shape[0]>2:
         pl = np.polyfit(warped.shape[0]-flx, fly, 2)
     else:
         pl = None
-    if fry.shape[0]:
+    if fry.shape[0]>2:
         pr = np.polyfit(warped.shape[0]-frx, fry, 2)
     else:
         pr = None
+    # score the fitted polynomial by counting the number of lane pixels
+    # that follow the fitted lines
     left_count = 0
     right_count = 0
     offset = window_width/2
@@ -311,7 +310,7 @@ def fit_lane_poly(\
         # sanity check: lane width should not change too much
         lane_diff = pr[-1]-pl[-1]
         if abs(lane_diff-hist_lane_diff) > tolerance*hist_lane_diff:
-            # something is wrong, reject the lanes that jumps around too much
+            # if something is wrong, reject the lanes that jumps around too much
             if abs(pl[-1]-hist_coeff[-2]) > tolerance*hist_lane_diff:
                 left_count = 0
             if abs(pr[-1]-hist_coeff[-1]) > tolerance*hist_lane_diff:
@@ -322,28 +321,32 @@ def fit_lane_poly(\
         pr = np.zeros(3)
     left_count = left_count**2
     right_count = right_count**2
-    # print(pl, left_count, pr, right_count)
     Z = (1-update_rate)*hist_score + update_rate*(left_count + right_count)
     new_coeff = ((1-update_rate)*hist_score*hist_coeff[:2] + \
             update_rate*(left_count*pl[:2] + right_count*pr[:2])) / Z
     new_curv = curvature(new_coeff[0], new_coeff[1])
     if curv is not None:
+        # curvature regularization: allow large change only when confident
         curv_reg = (left_count+right_count)/hist_score*abs(curv)/abs(new_curv-curv)
         curv_reg = min(1., curv_reg)
         left_count *= curv_reg
         right_count *= curv_reg
+    # compute update again with curvature regularization
+    Z = (1-update_rate)*hist_score + update_rate*(left_count + right_count)
+    new_coeff = ((1-update_rate)*hist_score*hist_coeff[:2] + \
+            update_rate*(left_count*pl[:2] + right_count*pr[:2])) / Z
     cl = ((1-update_rate)*hist_score*hist_coeff[2] + \
             update_rate*left_count*pl[-1]) / \
             ((1-update_rate)*hist_score + update_rate*left_count)
     cr = ((1-update_rate)*hist_score*hist_coeff[3] + \
             update_rate*right_count*pr[-1]) / \
             ((1-update_rate)*hist_score + update_rate*right_count)
-    # print(new_coeff, cl, cr, Z)
     return np.hstack([new_coeff,[cl,cr]]), Z
 
 def draw_lanes(img_ud, coeff, pp_mtx_inv, annotate=True):
     """
     img_ud - undistorted image on which lanes will be marked
+    coeff - coefficients of fitted lane line polynomials
     pp_mtx_inv - the inverse perspective transform matrix
     annotate - whether to put curvature numbers on image
 

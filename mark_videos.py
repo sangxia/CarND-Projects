@@ -8,9 +8,7 @@ from moviepy.editor import VideoFileClip
 from moviepy.config import change_settings
 change_settings({'FFMPEG_BINARY': '/usr/bin/ffmpeg'})
 
-logs = {\
-        'null_count': 0, \
-        'coeff': np.zeros(4), \
+logs = {'coeff': np.zeros(4), \
         'score': 0.}
 
 def process_image(img, dist_info, pp_mtx, pp_mtx_inv, logs, \
@@ -26,10 +24,6 @@ def process_image(img, dist_info, pp_mtx, pp_mtx_inv, logs, \
     logs['coeff'] = coeff
     logs['score'] = score
     result = marklane.draw_lanes(img_ud, coeff, pp_mtx_inv)
-    if result[1] is None:
-        null_count = logs['null_count']
-        cv2.imwrite('error_images/{0}.jpg'.format(null_count), img)
-        logs['null_count'] = null_count+1
     return result[0][:,:,::-1]
 
 with open('distort_calibration.pickle', 'rb') as f:
