@@ -53,7 +53,7 @@ def binary_lane_threshold(img_ud):
     sobel_x = abs_sobel(gray, orient='x')
     sobel_y = abs_sobel(gray, orient='y')
     sobel_rel_mag = sobel_magnitude_thresh(\
-            sobel_x, sobel_y, wy=0.1, thresh=(0.02,1))
+            sobel_x, sobel_y, wy=0.05, thresh=(0.05,1))
     # denoise
     sobel_rel_mag = cv2.GaussianBlur(sobel_rel_mag, (13,13), 0)
     sobel_rel_mag = (sobel_rel_mag>0.7)
@@ -76,6 +76,7 @@ def binary_lane_threshold(img_ud):
             -1,np.ones((9,9))),0,1)
     res = cv2.GaussianBlur(s_channel*sobel_rel_mag*sobel_dir, (13,13), 0)
     res = 255*((res>0.8).astype(np.uint8))
+
     return res
 
 def get_perspective_matrix():
@@ -135,7 +136,7 @@ def find_window_centroids(warped, window_width, window_height, margin):
             l_center_new = np.argmax(conv_ptr[l_min_index:l_max_index])+l_min_index-offset
             l_center_new = l_center_new.astype(np.int)
             l_center_offset = min(l_center_new+offset, warped.shape[1]).astype(np.int)
-            if conv_ptr[l_center_offset] < mask_thresh:
+            if conv_ptr[l_center_offset] < (mask_thresh if l_center else init_thresh):
                 # no candidate found
                 l_center_new = None
             else:
@@ -155,7 +156,7 @@ def find_window_centroids(warped, window_width, window_height, margin):
             r_center_new = np.argmin(conv_ptr[r_min_index:r_max_index])+r_min_index-offset
             r_center_new = r_center_new.astype(np.int)
             r_center_offset = min(r_center_new+offset, warped.shape[1]).astype(np.int)
-            if -conv_ptr[r_center_offset] < mask_thresh:
+            if -conv_ptr[r_center_offset] < (mask_thresh if l_center else init_thresh):
                 r_center_new = None
             else:
                 if r_center:
@@ -238,8 +239,8 @@ def fit_lane_centroids(\
     rx, ry = np.array(rx), np.array(ry)
     flx, fly = np.array(flx), np.array(fly)
     frx, fry = np.array(frx), np.array(fry)
-    fly -= int(window_width/4)
-    fry += int(window_width/3)
+    fly -= int(window_width/5.7)
+    fry += int(window_width/2.8)
     return lx, ly, rx, ry, flx, fly, frx, fry
 
 def sim_ratio(x, y, thresh=0.1):
@@ -258,8 +259,8 @@ def fit_lane_poly(\
         window_width, \
         window_height, \
         flx, fly, frx, fry, \
-        hist_coeff, hist_score, \
-        update_rate=0.1):
+        hist_coeff, hist_scores, \
+        update_rate=0.15):
     """
     warped - the warped image, used to calculate score for the new prediction
     flx, fly, frx, fry - coordinates of lane centroids
@@ -268,12 +269,12 @@ def fit_lane_poly(\
                  linear term, the third is the constant term for left, the last
                  is the constant term for right 
                  coefficients are in pixel space
-    hist_score - score weighted by the number of pixels in a prediction, 0 if 
-                 this is the first prediction
+    hist_scores - scores for the two lines weighted by the number of pixels 
+                  in a prediction, 0 if this is the first prediction
 
-    return the new hist_coeff and hist_score
+    return the new hist_coeff and hist_scores
     """
-    if hist_score > 0:
+    if hist_scores[2] > 0:
         curv = curvature(hist_coeff[0], hist_coeff[1])
     else:
         curv = None
@@ -303,9 +304,9 @@ def fit_lane_poly(\
             y = np.polyval(pr, warped.shape[0]-x_top)
             right_count += np.sum(warped[int(x_top):int(x_top+window_height), \
                     int(y-offset):int(y+offset)])/255
-    hist_lane_diff = (hist_coeff[-1]-hist_coeff[-2]) if hist_score>=1 \
+    hist_lane_diff = (hist_coeff[-1]-hist_coeff[-2]) if hist_scores[2]>=1 \
             else 600.
-    tolerance = 0.15 if hist_score>=1 else 0.5
+    tolerance = 0.15 if hist_scores[2]>=1 else 0.5
     if pl is not None and pr is not None:
         # sanity check: lane width should not change too much
         lane_diff = pr[-1]-pl[-1]
@@ -321,27 +322,31 @@ def fit_lane_poly(\
         pr = np.zeros(3)
     left_count = left_count**2
     right_count = right_count**2
-    Z = (1-update_rate)*hist_score + update_rate*(left_count + right_count)
-    new_coeff = ((1-update_rate)*hist_score*hist_coeff[:2] + \
+    Z = (1-update_rate)*hist_scores[2] + update_rate*(left_count + right_count)
+    new_coeff = ((1-update_rate)*hist_scores[2]*hist_coeff[:2] + \
             update_rate*(left_count*pl[:2] + right_count*pr[:2])) / Z
     new_curv = curvature(new_coeff[0], new_coeff[1])
     if curv is not None:
         # curvature regularization: allow large change only when confident
-        curv_reg = (left_count+right_count)/hist_score*abs(curv)/abs(new_curv-curv)
+        curv_reg = (left_count+right_count)/hist_scores[2] * \
+                abs(curv)/abs(new_curv-curv)
         curv_reg = min(1., curv_reg)
         left_count *= curv_reg
         right_count *= curv_reg
     # compute update again with curvature regularization
-    Z = (1-update_rate)*hist_score + update_rate*(left_count + right_count)
-    new_coeff = ((1-update_rate)*hist_score*hist_coeff[:2] + \
+    Z = (1-update_rate)*hist_scores[2] + update_rate*(left_count + right_count)
+    new_coeff = ((1-update_rate)*hist_scores[2]*hist_coeff[:2] + \
             update_rate*(left_count*pl[:2] + right_count*pr[:2])) / Z
-    cl = ((1-update_rate)*hist_score*hist_coeff[2] + \
+    cl = ((1-update_rate)*hist_scores[0]*hist_coeff[2] + \
             update_rate*left_count*pl[-1]) / \
-            ((1-update_rate)*hist_score + update_rate*left_count)
-    cr = ((1-update_rate)*hist_score*hist_coeff[3] + \
+            ((1-update_rate)*hist_scores[0] + update_rate*left_count)
+    cr = ((1-update_rate)*hist_scores[1]*hist_coeff[3] + \
             update_rate*right_count*pr[-1]) / \
-            ((1-update_rate)*hist_score + update_rate*right_count)
-    return np.hstack([new_coeff,[cl,cr]]), Z
+            ((1-update_rate)*hist_scores[1] + update_rate*right_count)
+    return np.hstack([new_coeff,[cl,cr]]), \
+            [(1-update_rate)*hist_scores[0]+update_rate*left_count, \
+            (1-update_rate)*hist_scores[1]+update_rate*right_count, \
+            Z]
 
 def draw_lanes(img_ud, coeff, pp_mtx_inv, annotate=True):
     """
