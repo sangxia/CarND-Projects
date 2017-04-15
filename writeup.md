@@ -1,7 +1,5 @@
 # Advanced Lane Finding
 
----
-
 The goals / steps of this project are the following:
 
 * Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
@@ -35,6 +33,14 @@ I then used the output `objpoints` and `imgpoints` to compute the camera calibra
 The functions used in the pipeline for both images and videos are in `marklane.py`. Throughout this writeup, I use the following test image as an example.
 
 ![Original image][original]
+
+All test image outputs can be found in [here](./output_images/). The filename prefix follows the convention below:
+* ud - undistorted version of the image
+* bn - threshold binary image
+* wp - warped/rectified binary image
+* wf - warped binary image with fitted windows and lane polynomials
+* final - images with lane areas marked
+* summary - a 2x3 grid containing all the above
 
 ### Camera Calibration
 
