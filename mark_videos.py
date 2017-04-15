@@ -14,7 +14,7 @@ logs = {\
         'score': 0.}
 
 def process_image(img, dist_info, pp_mtx, pp_mtx_inv, logs, \
-        window_width=150, window_height=50, margin=80):
+        window_width=150, window_height=50, margin=150):
     img_ud = marklane.undistort(img, dist_info)
     binary = marklane.binary_lane_threshold(img_ud)
     warped = marklane.warp_img(binary, pp_mtx)
@@ -37,11 +37,10 @@ with open('distort_calibration.pickle', 'rb') as f:
 
 pp_mtx, pp_mtx_inv = marklane.get_perspective_matrix()
 
-fname = 'project_video.mp4'
+fname = 'harder_challenge_video.mp4'
 clip1 = VideoFileClip(fname)
 clip2 = clip1.fl_image(lambda img: \
         process_image(img[:,:,::-1], dist_info, pp_mtx, pp_mtx_inv, logs))
 clip2.write_videofile('output_'+fname, audio=False)
 
-print(logs['null_count'])
 

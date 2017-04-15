@@ -247,13 +247,20 @@ def sim_ratio(x, y, thresh=0.1):
     """ returns whether each entry of y deviates less than thresh from x """
     return np.alltrue(np.abs(x-y) < np.abs(x)*thresh)
 
+def curvature(a, b):
+    xm_per_pix = 30/720 # meters per pixel vertically
+    ym_per_pix = 3.7/700 # meters per pixel horizontally
+    x = a * ym_per_pix/xm_per_pix**2
+    y = b * ym_per_pix/xm_per_pix
+    return ((1 + y**2)**1.5) / (2*x)
+
 def fit_lane_poly(\
         warped, \
         window_width, \
         window_height, \
         flx, fly, frx, fry, \
         hist_coeff, hist_score, \
-        update_rate=0.2):
+        update_rate=0.1):
     """
     warped - the warped image, used to calculate score for the new prediction
     flx, fly, frx, fry - coordinates of lane centroids
@@ -270,6 +277,12 @@ def fit_lane_poly(\
     # fit new polynomial if there is enough data
     # invert the x (vertical) coordinate so the nearer side has smaller value
     # this makes it easier to estimate lane width
+
+    if hist_score > 0:
+        curv = curvature(hist_coeff[0], hist_coeff[1])
+    else:
+        curv = None
+
     if flx.shape[0]:
         pl = np.polyfit(warped.shape[0]-flx, fly, 2)
     else:
@@ -313,6 +326,12 @@ def fit_lane_poly(\
     Z = (1-update_rate)*hist_score + update_rate*(left_count + right_count)
     new_coeff = ((1-update_rate)*hist_score*hist_coeff[:2] + \
             update_rate*(left_count*pl[:2] + right_count*pr[:2])) / Z
+    new_curv = curvature(new_coeff[0], new_coeff[1])
+    if curv is not None:
+        curv_reg = (left_count+right_count)/hist_score*abs(curv)/abs(new_curv-curv)
+        curv_reg = min(1., curv_reg)
+        left_count *= curv_reg
+        right_count *= curv_reg
     cl = ((1-update_rate)*hist_score*hist_coeff[2] + \
             update_rate*left_count*pl[-1]) / \
             ((1-update_rate)*hist_score + update_rate*left_count)
@@ -352,15 +371,13 @@ def draw_lanes(img_ud, coeff, pp_mtx_inv, annotate=True):
     # Combine the result with the original image
     result = cv2.addWeighted(img_ud, 1, newwarp, 0.3, 0)
     # now compute distance and curvature
+    
     xm_per_pix = 30/720 # meters per pixel vertically
     ym_per_pix = 3.7/700 # meters per pixel horizontally
+    coeff_adj = np.array([ym_per_pix/xm_per_pix**2, ym_per_pix/xm_per_pix, ym_per_pix])
+    left_fit_cr = pl * coeff_adj
+    right_fit_cr = pr * coeff_adj
     x_eval = 0
-    fx = np.arange(0, img_ud.shape[0], img_ud.shape[0]/5)
-    fly = np.polyval(pl, fx)
-    fry = np.polyval(pr, fx)
-    # Fit new polynomials to x,y in world space
-    left_fit_cr = np.polyfit(fx*xm_per_pix, fly*ym_per_pix, 2)
-    right_fit_cr = np.polyfit(fx*xm_per_pix, fry*ym_per_pix, 2)
     # Calculate the new radii of curvature
     left_curverad = ((1 + (2*left_fit_cr[0]*x_eval*xm_per_pix + left_fit_cr[1])**2)**1.5) / np.absolute(2*left_fit_cr[0])
     right_curverad = ((1 + (2*right_fit_cr[0]*x_eval*xm_per_pix + right_fit_cr[1])**2)**1.5) / np.absolute(2*right_fit_cr[0])
