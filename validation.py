@@ -44,6 +44,7 @@ feature_list = [\
         ('b_hog', 1764), \
         ('g_hog', 1764), \
         ('r_hog', 1764)]
+hogset = set(['y_hog', 'l_hog', 's_hsv_hog', 'b_hog', 'g_hog'])
 
 print('loading data')
 vehicle = np.load('vehicle_feature.npy')
@@ -53,21 +54,18 @@ print('vehicle', vehicle.shape)
 print('nonvehicle', nonvehicle.shape)
 
 print('loading split')
-#with open('validation_split.pickle', 'rb') as f:
-#    split_v, split_nv = pickle.load(f)
-#train_v, test_v = split_v
-#train_nv, test_nv = split_nv
-test_v, train_v = list(range(8792-5966)), list(range(8792-5966,8792))
-test_nv, train_nv = list(range(8968-3900)), list(range(8968-3900))
-#train_v, test_v = np.array(train_v), np.array(test_v)
-#train_nv, test_nv = np.array(train_nv), np.array(test_nv)
-
-#train_features = np.concatenate([\
-#        vehicle[train_v[:,None],feature_col], \
-#        nonvehicle[train_nv[:,None],feature_col]])
-#test_features = np.concatenate([\
-#        vehicle[test_v[:,None],feature_col], \
-#        nonvehicle[test_nv[:,None],feature_col]])
+split_ratio = 0.7
+train_v = list(range(int(834*split_ratio))) + \
+        list(range(834,834+int(909*split_ratio))) + \
+        list(range(834+909,834+909+int(419*split_ratio))) + \
+        list(range(834+909+419,834+909+419+int(664*split_ratio))) + \
+        list(range(834+909+419+664,834+909+419+664+int(5966*split_ratio)))
+train_v_set = set(train_v)
+test_v = [x for x in range(8792) if x not in train_v_set]
+train_nv = list(range(int(5068*split_ratio))) + \
+        list(range(5068,5068+int(3900*split_ratio)))
+train_nv_set = set(train_nv)
+test_nv = [x for x in range(8968) if x not in train_nv_set]
 
 train_features = np.concatenate([vehicle[train_v,:], nonvehicle[train_nv,:]])
 test_features = np.concatenate([vehicle[test_v,:], nonvehicle[test_nv,:]])
@@ -76,16 +74,16 @@ test_labels = np.concatenate([np.ones(len(test_v)), np.zeros(len(test_nv))])
 
 paramslist = []
 for c, gamma,hog_f in product(\
-        np.arange(0.8,3.3,0.2), \
-        np.arange(0.6,1.6,0.1), \
-        [x[0] for x in feature_list if 'hog' in x[0] and (x[0] != 's_hls_hog')]):
+        np.arange(1.6,2.5,0.2), \
+        np.arange(0.5,1.7,0.1), \
+        hogset):
     paramslist.append({\
             'feature_list': feature_list, \
             'features': set(['h_histogram', hog_f]), \
             'C': c, \
             'gamma': gamma})
 
-print('training')
+print('training, total', len(paramslist))
 results = Parallel(n_jobs=7, max_nbytes=1e6)(\
         delayed(run)(\
         params, \
