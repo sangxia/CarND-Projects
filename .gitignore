@@ -3,4 +3,5 @@
 *.pickle
 *.swp
 dataset/
+__pycache__/
 
