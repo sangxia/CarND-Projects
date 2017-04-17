@@ -24,7 +24,7 @@ def channel_hog(img, n_orient=9, pix_per_cell=8, cell_per_block=2, \
 
 def channel_hist(img, nbins=32, bins_range=(0, 256)):
     # Compute the histogram of the color channels separately
-    return np.histogram(img, bins=nbins, range=bins_range)
+    return np.histogram(img, bins=nbins, range=bins_range)[0]
 
 def get_features(img):
     # img is in BGR format
@@ -51,9 +51,11 @@ with open('dataset-data.pickle', 'rb') as f:
 for data, fname in zip(\
         [vehicle_data, nonvehicle_data], \
         ['vehicle_feature', 'nonvehicle_feature']):
-    print(fname)
     features = []
-    for p in data:
+    names = sorted(list(data.keys()))
+    print(fname, names)
+    for p in names:
+        print(p)
         for img in data[p]:
             features.append(get_features(img))
     features = np.stack(features)
