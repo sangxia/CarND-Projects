@@ -21,7 +21,9 @@ def run(params, \
     scaler.fit(trainX)
     trainX = scaler.transform(trainX)
     testX = scaler.transform(testX)
-    clf = SVC(C=params['C'], gamma=params['gamma']/len(feature_col))
+    clf = SVC(C=params['C'], \
+            gamma=params['gamma']/len(feature_col), \
+            probability=False) # probability=True seems significantly slower
     clf.fit(trainX, train_labels)
     pred = clf.predict(testX)
     acc = [np.mean((pred==1) & (test_labels==1))/np.mean(test_labels==1), \
@@ -73,15 +75,25 @@ train_labels = np.concatenate([np.ones(len(train_v)), np.zeros(len(train_nv))])
 test_labels = np.concatenate([np.ones(len(test_v)), np.zeros(len(test_nv))])
 
 paramslist = []
-for c, gamma,hog_f in product(\
-        np.arange(1.6,2.5,0.2), \
-        np.arange(0.5,1.7,0.1), \
-        hogset):
+for c, gamma in product(\
+        np.arange(1.8,2.3,0.1), \
+        np.arange(0.6,1.3,0.1)):
     paramslist.append({\
             'feature_list': feature_list, \
-            'features': set(['h_histogram', hog_f]), \
+            'features': set(['l_hog']), \
             'C': c, \
             'gamma': gamma})
+
+#for c, gamma,hog_f in product(\
+#        np.arange(1.6,2.5,0.2), \
+#        np.arange(0.5,1.7,0.1), \
+#        hogset):
+#    paramslist.append({\
+#            'feature_list': feature_list, \
+#            'features': set(['h_histogram', hog_f]), \
+#            'C': c, \
+#            'gamma': gamma})
+
 
 print('training, total', len(paramslist))
 results = Parallel(n_jobs=7, max_nbytes=1e6)(\
