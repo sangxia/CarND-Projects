@@ -125,7 +125,8 @@ def detect_vehicles_parallel(img, scaler, clf):
             (592,1280, 145,800, 2), \
             (656,1280, 148,640, 1), \
             (656,1280, 111,480, 1), \
-            (656,1280, 74,320, 1)]
+            #(656,1280, 74,320, 1), \
+            ]
     # size is (32,) 64, 85.33, 102.4, 128, 170.66, 256
     images = [crop_and_hls(img, x) for x in crop_list]
     # matrix to store extracted features
@@ -167,4 +168,20 @@ def get_heatmap(shape, boxes, thresh):
 
 def get_labels(heatmap):
     return label(heatmap)
+
+def get_bboxes(hm, lbls):
+    result = []
+    for i in range(lbls):
+        bboxes = []
+        lst = np.where(hm==(i+1))
+        result.append((\
+                np.min(lst[1]), np.min(lst[0]), \
+                np.max(lst[1]), np.max(lst[0])))
+    return result
+
+def draw_boxes(img, bboxes, color=(0, 255, 255), thick=6):
+    imcopy = np.copy(img)
+    for bbox in bboxes:
+        cv2.rectangle(imcopy, bbox[:2], bbox[2:], color, thick)
+    return imcopy
 
