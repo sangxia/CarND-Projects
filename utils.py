@@ -4,6 +4,7 @@ from scipy.ndimage.filters import convolve
 import cv2
 from itertools import product
 from scipy.ndimage.measurements import label
+from joblib import delayed, Parallel
 
 def channel_hog(img, n_orient=9, pix_per_cell=8, cell_per_block=2, \
                      transform_sqrt = False, \
@@ -49,29 +50,30 @@ def get_features(img):
             features.append(channel_hog(ch[:,:,0]))
     return np.concatenate(features)
 
-def get_features_for_detection(img):
-    """
-    img should be cropped and scaled 
-    both dimension of the image should be multiples of 8
-    the assumption is that crops of img of size 64x64 will
-    be fed into a classifier
+#def get_features_for_detection(img):
+#    """
+#    img should be cropped and scaled 
+#    both dimension of the image should be multiples of 8
+#    the assumption is that crops of img of size 64x64 will
+#    be fed into a classifier
+#
+#    returns hog feature, and hue channel histogram with 
+#    15 bins for 8x8 cells
+#    """
+#    hls = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
+#    hog_feature = channel_hog(hls[:,:,1], feature_vec=False)
+#    h_channel = (hls[:,:,0]/12).astype(np.int)
+#    # do one-hot encoding for the histogram
+#    h_hist = (np.arange(15) == h_channel[:,:,None]).astype(int)
+#    weight = np.dstack(\
+#            [np.zeros((8,8)) for _ in range(7)] + \
+#            [np.ones((8,8))] + \
+#            [np.zeros((8,8)) for _ in range(7)])
+#    h_hist = convolve(h_hist, weight, mode='constant')[3::8,3::8,:]
+#    return hog_feature, h_hist
 
-    returns hog feature, and hue channel histogram with 
-    15 bins for 8x8 cells
-    """
-    hls = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
-    hog_feature = channel_hog(hls[:,:,1], feature_vec=False)
-    h_channel = (hls[:,:,0]/12).astype(np.int)
-    # do one-hot encoding for the histogram
-    h_hist = (np.arange(15) == h_channel[:,:,None]).astype(int)
-    weight = np.dstack(\
-            [np.zeros((8,8)) for _ in range(7)] + \
-            [np.ones((8,8))] + \
-            [np.zeros((8,8)) for _ in range(7)])
-    h_hist = convolve(h_hist, weight, mode='constant')[3::8,3::8,:]
-    return hog_feature, h_hist
-
-def detect_vehicles_single_scale(img, scaler, clf, coord_scale, channeled=False):
+def detect_vehicles_single_scale(img, scaler, clf, cell_stride=2, \
+        coord_scale=1.0, base_r=0, base_c=0, channeled=False):
     """
     img should be cropped and scaled 
     both dimension of the image should be multiples of 8
@@ -86,7 +88,6 @@ def detect_vehicles_single_scale(img, scaler, clf, coord_scale, channeled=False)
     else:
         channels = img
     ncells_per_window = 8
-    cell_stride = 2
     max_row = (img.shape[0]//8)-ncells_per_window
     max_col = (img.shape[1]//8)-ncells_per_window
     for r,c in product(range(0,max_row,cell_stride), range(0,max_col,cell_stride)):
@@ -97,10 +98,65 @@ def detect_vehicles_single_scale(img, scaler, clf, coord_scale, channeled=False)
         pred = clf.predict(scaled_feat)
         if pred:
             results.append((\
-                    int(coord_scale*r*8),int(coord_scale*c*8), \
-                    int(coord_scale*r*8+64*coord_scale), int(coord_scale*c*8+64*coord_scale)))
+                    int(base_r+coord_scale*r*8),int(base_c+coord_scale*c*8), \
+                    int(base_r+coord_scale*r*8+64*coord_scale), int(base_c+coord_scale*c*8+64*coord_scale)))
 
     return results
+
+def perform_feature_extraction(hls, r, c, base_r, base_c, coord_scale):
+    """ the location parameters are recorded for inferring boxes """
+    cell_hist = channel_hist(hls[r*8:r*8+64, c*8:c*8+64, 0], nbins=15, bins_range=(0,180))
+    cell_feat = channel_hog(hls[r*8:r*8+64, c*8:c*8+64, 1])
+    return np.concatenate([[base_r, base_c, r, c, coord_scale], cell_hist, cell_feat])
+
+def crop_and_hls(img, x):
+    return cv2.cvtColor(cv2.resize(img[360:x[0],:x[1],:], (x[3],x[2])), cv2.COLOR_BGR2HLS)
+
+def detect_vehicles_parallel(img, scaler, clf):
+    # crops always has top left (360,0)
+    # the first two numbers are the bottom right
+    # the next two are the dst size
+    # final number is cell_stride
+    n_jobs = 8
+    crop_list = [\
+            #(464,1280, 208,2560, 4), \
+            (496,1280, 136,1280, 2), \
+            (560,1280, 150,960, 2), \
+            (592,1280, 145,800, 2), \
+            (656,1280, 148,640, 1), \
+            (656,1280, 111,480, 1), \
+            (656,1280, 74,320, 1)]
+    # size is (32,) 64, 85.33, 102.4, 128, 170.66, 256
+    images = [crop_and_hls(img, x) for x in crop_list]
+    # matrix to store extracted features
+    features = []
+    ncells_per_window = 8
+    for cp,image in zip(crop_list, images):
+        max_row = (image.shape[0]//8)-ncells_per_window
+        max_col = (image.shape[1]//8)-ncells_per_window
+        cell_stride = cp[-1]
+        features += Parallel(n_jobs=n_jobs)(\
+                delayed(perform_feature_extraction)(\
+                image, r, c, 360, 0, (cp[0]-360)/cp[2]) \
+                for r,c in product(\
+                range(0,max_row,cell_stride), \
+                range(0,max_col,cell_stride)))
+    features = np.stack(features)
+    features[:,5:] = scaler.transform(features[:,5:])
+    step = features.shape[0] // n_jobs
+    results = Parallel(n_jobs=n_jobs)(\
+            delayed(clf.predict)(features[start:start+step,5:]) \
+            for start in range(0,features.shape[0],step))
+    results = np.concatenate([features[:,:5], \
+            np.concatenate(results)[:,None]], axis=1)
+    results = results[results[:,-1]==1]
+    results = np.stack([\
+            results[:,0]+results[:,2]*results[:,4]*8, \
+            results[:,1]+results[:,3]*results[:,4]*8, \
+            results[:,0]+results[:,2]*results[:,4]*8+results[:,4]*64, \
+            results[:,1]+results[:,3]*results[:,4]*8+results[:,4]*64], \
+            axis=1).astype(np.int)
+    return list(results)
 
 def get_heatmap(shape, boxes, thresh):
     heatmap = np.zeros(shape)
