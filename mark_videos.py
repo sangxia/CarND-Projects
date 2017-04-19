@@ -55,7 +55,7 @@ def process_image(img, scaler, clf, states):
     print(len(rois), rois)
     print(states['detections'])
     boxes = utils.detect_vehicles_in_boxes_parallel(\
-            img, rois, scaler, clf)
+            img, rois, scaler, clf, True)
     heatmap = utils.get_heatmap(img.shape, boxes, 4)
     hmlbl, lbls = utils.get_labels(heatmap)
     bboxes = utils.get_bboxes(hmlbl, lbls)
@@ -68,7 +68,7 @@ def process_image(img, scaler, clf, states):
     return utils.draw_boxes(img, \
             [b[0] for b in states['detections'] if b[1]>thresh])[:,:,::-1]
 
-model_fname = 'model_fullset'
+model_fname = 'model_fullset_cv2'
 scaler, clf = joblib.load(model_fname + '_scaler.pickle'), \
         joblib.load(model_fname + '_svc.pickle')
 

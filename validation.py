@@ -49,8 +49,8 @@ feature_list = [\
 hogset = set(['y_hog', 'l_hog', 's_hsv_hog', 'b_hog', 'g_hog'])
 
 print('loading data')
-vehicle = np.load('vehicle_feature.npy')
-nonvehicle = np.load('nonvehicle_feature.npy')
+vehicle = np.load('vehicle_feature_cv2.npy')
+nonvehicle = np.load('nonvehicle_feature_cv2.npy')
 # consumes about about 6G ram here
 print('vehicle', vehicle.shape)
 print('nonvehicle', nonvehicle.shape)
@@ -76,11 +76,11 @@ test_labels = np.concatenate([np.ones(len(test_v)), np.zeros(len(test_nv))])
 
 paramslist = []
 for c, gamma in product(\
-        np.arange(1.8,2.3,0.1), \
-        np.arange(0.6,1.3,0.1)):
+        np.arange(1.9,2.2,0.1), \
+        np.arange(0.9,1.2,0.1)):
     paramslist.append({\
             'feature_list': feature_list, \
-            'features': set(['l_hog']), \
+            'features': set(['l_hog','h_histogram']), \
             'C': c, \
             'gamma': gamma})
 

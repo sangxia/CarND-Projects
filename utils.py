@@ -6,6 +6,10 @@ from itertools import product
 from scipy.ndimage.measurements import label
 from joblib import delayed, Parallel
 
+def channel_hog_cv2(img, hd):
+    res = hd.compute(img, locations=[(1,1)])
+    return res.reshape(-1)
+
 def channel_hog(img, n_orient=9, pix_per_cell=8, cell_per_block=2, \
                      transform_sqrt = False, \
                      vis=False, feature_vec=True, hd=None):
@@ -52,17 +56,46 @@ def get_features(img, hd=None):
             features.append(channel_hog(ch[:,:,0],hd=hd))
     return np.concatenate(features)
 
+def get_features_cv2(img, hd):
+    """
+    takes as input img in BGR format, outputs a concatenated
+    feature containing hog of the relevant channels and histogram
+    of the hue channel
+    """
+    features = []
+    # obtain the relevant channels
+    y = cv2.cvtColor(img, cv2.COLOR_BGR2YCrCb)[:,:,0]
+    h, l, s_hls = np.dsplit(cv2.cvtColor(img, cv2.COLOR_BGR2HLS), 3)
+    s_hsv, v = np.dsplit(cv2.cvtColor(img, cv2.COLOR_BGR2HSV)[:,:,1:], 2)
+    b, g, r = np.dsplit(img, 3)
+    # histogram of hue channel
+    features.append(channel_hist(h, nbins=15, bins_range=(0,180)))
+    # hog for other channels
+    for ch in [y, l, s_hls, s_hsv, v, b, g, r]:
+        if len(ch.shape) == 2:
+            features.append(channel_hog_cv2(ch,hd))
+        else:
+            features.append(channel_hog_cv2(ch[:,:,0],hd))
+    return np.concatenate(features)
+
 def perform_feature_extraction(hls, r, c, base_r, base_c, coord_scale):
     """ the location parameters are recorded for inferring boxes """
     cell_hist = channel_hist(hls[r*8:r*8+64, c*8:c*8+64, 0], nbins=15, bins_range=(0,180))
-    cell_feat = channel_hog(hls[r*8:r*8+64, c*8:c*8+64, 1])
+    cell_feat = channel_hog_cv2(hls[r*8:r*8+64, c*8:c*8+64, 1], margin=False)
+    return np.concatenate([[base_r, base_c, r, c, coord_scale], cell_hist, cell_feat])
+
+def perform_feature_extraction_cv2(hls, r, c, base_r, base_c, coord_scale):
+    """ the location parameters are recorded for inferring boxes """
+    hd = cv2.HOGDescriptor((64,64),(16,16),(8,8),(8,8),9)
+    cell_hist = channel_hist(hls[r*8:r*8+64, c*8:c*8+64, 0], nbins=15, bins_range=(0,180))
+    cell_feat = channel_hog_cv2(hls[r*8-1:r*8+64+1, c*8-1:c*8+64+1, 1], hd)
     return np.concatenate([[base_r, base_c, r, c, coord_scale], cell_hist, cell_feat])
 
 def crop_and_hls(img, x):
     return cv2.cvtColor(cv2.resize(\
             img[x[0]:x[2],x[1]:x[3],:], (x[5],x[4])), cv2.COLOR_BGR2HLS)
 
-def detect_vehicles_from_crops(img, crop_list, scaler, clf):
+def detect_vehicles_from_crops(img, crop_list, scaler, clf, hd=False):
     n_jobs = 8
     images = [crop_and_hls(img, x) for x in crop_list]
     # matrix to store extracted features
@@ -70,18 +103,24 @@ def detect_vehicles_from_crops(img, crop_list, scaler, clf):
     ncells_per_window = 8
     paramslist = []
     for cp,image in zip(crop_list, images):
-        max_row = (image.shape[0]//8)-ncells_per_window
-        max_col = (image.shape[1]//8)-ncells_per_window
+        max_row = ((image.shape[0]-hd)//8)-ncells_per_window
+        max_col = ((image.shape[1]-hd)//8)-ncells_per_window
         cell_stride = cp[-1]
         paramslist += [
                 (image, r, c, cp[0], cp[1], (cp[2]-cp[0])/cp[4]) \
                 for r,c in product(\
-                range(0,max_row,cell_stride), \
-                range(0,max_col,cell_stride))]
-    features = Parallel(n_jobs=n_jobs)(\
-            delayed(perform_feature_extraction)(\
-            param[0], param[1], param[2], param[3], param[4], param[5]) \
-            for param in paramslist)
+                range(hd,max_row,cell_stride), \
+                range(hd,max_col,cell_stride))]
+    if not hd:
+        features = Parallel(n_jobs=n_jobs)(\
+                delayed(perform_feature_extraction)(\
+                param[0], param[1], param[2], param[3], param[4], param[5]) \
+                for param in paramslist)
+    else:
+        features = Parallel(n_jobs=n_jobs)(\
+                delayed(perform_feature_extraction_cv2)(\
+                param[0], param[1], param[2], param[3], param[4], param[5]) \
+                for param in paramslist)
     features = np.stack(features)
     features[:,5:] = scaler.transform(features[:,5:])
     step = features.shape[0] // n_jobs
@@ -99,7 +138,7 @@ def detect_vehicles_from_crops(img, crop_list, scaler, clf):
             axis=1).astype(np.int)
     return list(results)
 
-def detect_vehicles_parallel(img, scaler, clf):
+def detect_vehicles_parallel(img, scaler, clf, hd=None):
     # crops always has top left (360,0)
     # the first two numbers are coordinate of top left
     # followed by coordinates of bottom right
@@ -115,7 +154,7 @@ def detect_vehicles_parallel(img, scaler, clf):
             #(656,1280, 74,320, 1), \
             ]
     # size is (32,) 64, 85.33, 102.4, 128, 170.66, 256
-    return detect_vehicles_from_crops(img, crop_list, scaler, clf)
+    return detect_vehicles_from_crops(img, crop_list, scaler, clf, hd)
 
 def box_intersection(box1, box2):
     """
@@ -160,7 +199,7 @@ def iomin(b1, b2):
 def average_box(w1, b1, w2, b2):
     return tuple(int(w1*v1+w2*v2) for v1,v2 in zip(b1,b2))
 
-def detect_vehicles_in_boxes_parallel(img, boxes, scaler, clf):
+def detect_vehicles_in_boxes_parallel(img, boxes, scaler, clf, hd=False):
     """
     boxes contains a list of 4-tuples describing the top left
     and bottom right of the regions in the images
@@ -188,7 +227,7 @@ def detect_vehicles_in_boxes_parallel(img, boxes, scaler, clf):
                     int((crop_box[3]-crop_box[1])/rg[2]))
             if min(target_size)>=64:
                 crop_list.append(crop_box+target_size+(rg[3],))
-    return detect_vehicles_from_crops(img, crop_list, scaler, clf)
+    return detect_vehicles_from_crops(img, crop_list, scaler, clf, hd)
 
 def get_heatmap(shape, boxes, thresh):
     if len(shape) == 2:

@@ -53,8 +53,8 @@ feature_list = [\
         ('r_hog', 1764)]
 
 print('loading data')
-vehicle = np.load('vehicle_feature.npy')
-nonvehicle = np.load('nonvehicle_feature.npy')
+vehicle = np.load('vehicle_feature_cv2.npy')
+nonvehicle = np.load('nonvehicle_feature_cv2.npy')
 print('vehicle', vehicle.shape)
 print('nonvehicle', nonvehicle.shape)
 train_v = list(range(8792))
@@ -66,7 +66,7 @@ train_labels = np.concatenate([np.ones(len(train_v)), \
         np.zeros(len(train_nv))])
 
 print('loading cropped test images')
-test_features = np.load('cropped_test_images/cropped_test_data.npy')
+test_features = np.load('cropped_test_images/cropped_test_data_cv2.npy')
 with open('cropped_test_images/labels.pickle','rb') as f:
     test_labels = pickle.load(f)
 
@@ -76,7 +76,7 @@ test_labels = test_labels[\
         [3] + list(range(30,40)) + [4, 40] + list(range(5,10))]
 
 print('training')
-run(feature_list, set(['l_hog']), 2.1, 1.1, \
+run(feature_list, set(['l_hog','h_histogram']), 1.9, 0.9, \
         train_features, train_labels, test_features, test_labels, \
-        model_filename='model_fullset_lhog')
+        model_filename='model_fullset_cv2')
 
