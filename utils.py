@@ -164,8 +164,31 @@ def detect_vehicles_parallel(img, scaler, clf):
     # size is (32,) 64, 85.33, 102.4, 128, 170.66, 256
     return detect_vehicles_from_crops(img, crop_list, scaler, clf)
 
+def box_intersection(box1, box2):
+    """
+    box1 and box2 are 4-tuples
+    each has coordinates of top left followed by bottom right
+    returns the intersection if it exists, None if intersection
+    is empty
+    """
+    box = (max(box1[0], box2[0]), max(box1[1], box2[1]), \
+            min(box1[2], box2[2]), min(box1[3], box2[3]))
+    if (box[0]<box[2]) and (box[1]<box[3]):
+        return box
+    else:
+        return None
+
 def detect_vehicles_in_boxes_parallel(img, boxes, scaler, clf):
-    # each tuple correspond to one scaling setting
+    """
+    boxes contains a list of 4-tuples describing the top left
+    and bottom right of the regions in the images
+    detection will only be performed on those regions
+
+    for video detection, boxes would be detections from previous
+    frames (slightly expanded) as well as regions on the left and
+    right side of the frame
+    """
+    # each row_range tuple correspond to one scaling setting
     # first two are the top and bottom row number
     # third is the scaling factor
     # last is cell_stride
@@ -175,8 +198,14 @@ def detect_vehicles_in_boxes_parallel(img, boxes, scaler, clf):
             (360,592,1.6,2), \
             (360,656,2.,1), \
             (360,656,8/3,1)]
-
-
+    crop_list = []
+    for box,rg in product(boxes, row_range):
+        crop_box = box_intersection(box, (rg[0],0,rg[1],img.shape[1]))
+        if crop_box:
+            target_size = (int((crop_box[2]-crop_box[0])/rg[2]), \
+                    int((crop_box[3]-crop_box[1])/rg[2]))
+            if min(target_size)>=64:
+                crop_list.append(crop_box+target_size+(rg[3],))
     return detect_vehicles_from_crops(img, crop_list, scaler, clf)
 
 def get_heatmap(shape, boxes, thresh):
