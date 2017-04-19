@@ -8,8 +8,10 @@ from joblib import delayed, Parallel
 
 def channel_hog(img, n_orient=9, pix_per_cell=8, cell_per_block=2, \
                      transform_sqrt = False, \
-                     vis=False, feature_vec=True):
+                     vis=False, feature_vec=True, hd=None):
     # in skimage 0.12.3 L2 block-normalization is applied automatically
+    if hd is not None:
+        return hd.compute(img).reshape(-1)
     if vis:
         features, hog_image = hog(img, orientations=n_orient, \
                                   pixels_per_cell=(pix_per_cell, pix_per_cell), \
@@ -28,7 +30,7 @@ def channel_hog(img, n_orient=9, pix_per_cell=8, cell_per_block=2, \
 def channel_hist(img, nbins=32, bins_range=(0, 256)):
     return np.histogram(img, bins=nbins, range=bins_range)[0]
 
-def get_features(img):
+def get_features(img, hd=None):
     """
     takes as input img in BGR format, outputs a concatenated
     feature containing hog of the relevant channels and histogram
@@ -45,9 +47,9 @@ def get_features(img):
     # hog for other channels
     for ch in [y, l, s_hls, s_hsv, v, b, g, r]:
         if len(ch.shape) == 2:
-            features.append(channel_hog(ch))
+            features.append(channel_hog(ch,hd=hd))
         else:
-            features.append(channel_hog(ch[:,:,0]))
+            features.append(channel_hog(ch[:,:,0],hd=hd))
     return np.concatenate(features)
 
 def perform_feature_extraction(hls, r, c, base_r, base_c, coord_scale):
@@ -149,6 +151,15 @@ def box_area(box):
     else:
         return (box[3]-box[1])*(box[2]-box[0])
 
+def iou(b1, b2):
+    return box_area(box_intersection(b1, b2))/box_area(box_union(b1, b2))
+
+def iomin(b1, b2):
+    return box_area(box_intersection(b1, b2))/min(box_area(b1), box_area(b2))
+
+def average_box(w1, b1, w2, b2):
+    return tuple(int(w1*v1+w2*v2) for v1,v2 in zip(b1,b2))
+
 def detect_vehicles_in_boxes_parallel(img, boxes, scaler, clf):
     """
     boxes contains a list of 4-tuples describing the top left
@@ -177,7 +188,6 @@ def detect_vehicles_in_boxes_parallel(img, boxes, scaler, clf):
                     int((crop_box[3]-crop_box[1])/rg[2]))
             if min(target_size)>=64:
                 crop_list.append(crop_box+target_size+(rg[3],))
-    print(len(crop_list))
     return detect_vehicles_from_crops(img, crop_list, scaler, clf)
 
 def get_heatmap(shape, boxes, thresh):
