@@ -160,7 +160,10 @@ def detect_vehicles_parallel(img, scaler, clf):
     return list(results)
 
 def get_heatmap(shape, boxes, thresh):
-    heatmap = np.zeros(shape)
+    if len(shape) == 2:
+        heatmap = np.zeros(shape)
+    else:
+        heatmap = np.zeros(shape[:2])
     for b in boxes:
         heatmap[b[0]:b[2],b[1]:b[3]] += 1
     heatmap = (heatmap>=thresh)
@@ -175,13 +178,13 @@ def get_bboxes(hm, lbls):
         bboxes = []
         lst = np.where(hm==(i+1))
         result.append((\
-                np.min(lst[1]), np.min(lst[0]), \
-                np.max(lst[1]), np.max(lst[0])))
+                np.min(lst[0]), np.min(lst[1]), \
+                np.max(lst[0]), np.max(lst[1])))
     return result
 
 def draw_boxes(img, bboxes, color=(0, 255, 255), thick=6):
     imcopy = np.copy(img)
     for bbox in bboxes:
-        cv2.rectangle(imcopy, bbox[:2], bbox[2:], color, thick)
+        cv2.rectangle(imcopy, tuple(bbox[1::-1]), tuple(bbox[3:1:-1]), color, thick)
     return imcopy
 
