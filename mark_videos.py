@@ -52,19 +52,22 @@ def process_image(img, scaler, clf, states):
         for bb in states['detections']:
             rois.append(utils.expand_box(bb[0], 96))
         states['count_down'] -= 1
-    print(len(rois), rois)
-    print(states['detections'])
+    round_log = {}
+    round_log['ROIs'] = copy.copy(rois)
     boxes = utils.detect_vehicles_in_boxes_parallel(\
-            img, rois, scaler, clf, True)
+            img, rois, scaler, clf)
+    round_log['Raw Boxes'] = copy.copy(boxes)
     heatmap = utils.get_heatmap(img.shape, boxes, 4)
     hmlbl, lbls = utils.get_labels(heatmap)
     bboxes = utils.get_bboxes(hmlbl, lbls)
-    print('bboxes',bboxes)
+    round_log['Bounding Boxes'] = copy.copy(bboxes)
     states['detections'] = merge_detections(\
             states['detections'], \
             sorted(bboxes, key=lambda x: -utils.box_area(x)), \
             states['discount'])
+    round_log['Detections'] = copy.copy(states['detections'])
     thresh = (1-states['discount']**states['thresh_frame_count'])/(1-states['discount'])
+    states['history'].append(round_log)
     return utils.draw_boxes(img, \
             [b[0] for b in states['detections'] if b[1]>thresh])[:,:,::-1]
 
@@ -84,17 +87,26 @@ scaler, clf = joblib.load(model_fname + '_scaler.pickle'), \
 states = {\
         'initial_phase': 6, \
         'count_down': 0, \
-        'reset': 48, \
+        'reset': 72, \
         'border_region': [(360,960,656,1280),(360,0,656,320)], \
         'discount': 0.9, \
         'thresh_frame_count': 3, \
-        'detections': []}
+        'detections': [], \
+        'history': []}
 
-#fname = 'test_video.mp4'
 fname = 'project_video.mp4'
 clip1 = VideoFileClip(fname)
 clip2 = clip1.\
         fl_image(lambda img: \
         process_image(img[:,:,::-1], scaler, clf, states))
 clip2.write_videofile('output_'+fname, audio=False)
+
+with open('log.txt','w') as f:
+    for i,rlog in enumerate(states['history']):
+        _ = f.write('Frame {0}\n'.format(i+1))
+        _ = f.write('         ROI: {0}\n'.format(rlog['ROIs']))
+        _ = f.write('Inital Boxes: {0}\n'.format(rlog['Raw Boxes']))
+        _ = f.write('     B Boxes: {0}\n'.format(rlog['Bounding Boxes']))
+        _ = f.write('  Detections: {0}\n'.format(rlog['Detections']))
+        _ = f.write('\n')
 

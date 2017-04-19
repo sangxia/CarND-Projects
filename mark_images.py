@@ -15,13 +15,13 @@ scaler, clf = joblib.load(model_fname + '_scaler.pickle'), \
         joblib.load(model_fname + '_svc.pickle')
 
 file_list = sorted(glob.glob('test_images/*.jpg'))
-output_dir = 'output_images_cv2/'
+output_dir = 'output_images/'
 for f in file_list:
     time_start = time.time()
     fname = f[f.rindex('/')+1:]
     print('Processing', fname)
     img = cv2.imread(f)
-    boxes = utils.detect_vehicles_parallel(img, scaler, clf, True)
+    boxes = utils.detect_vehicles_parallel(img, scaler, clf)
     cv2.imwrite(output_dir + 'raw_boxes_' + fname, \
             utils.draw_boxes(img, boxes))
     heatmap = utils.get_heatmap(img.shape, boxes, 1)
