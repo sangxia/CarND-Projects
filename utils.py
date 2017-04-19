@@ -72,36 +72,36 @@ def get_features(img):
 #    h_hist = convolve(h_hist, weight, mode='constant')[3::8,3::8,:]
 #    return hog_feature, h_hist
 
-def detect_vehicles_single_scale(img, scaler, clf, cell_stride=2, \
-        coord_scale=1.0, base_r=0, base_c=0, channeled=False):
-    """
-    img should be cropped and scaled 
-    both dimension of the image should be multiples of 8
-    the algorithm looks for windows of size 64x64 pixels
-
-    results is a list of tuples containing the upper left 
-    corner of the vehicle windows
-    """
-    results = []
-    if not channeled:
-        channels = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
-    else:
-        channels = img
-    ncells_per_window = 8
-    max_row = (img.shape[0]//8)-ncells_per_window
-    max_col = (img.shape[1]//8)-ncells_per_window
-    for r,c in product(range(0,max_row,cell_stride), range(0,max_col,cell_stride)):
-        cell_hist = channel_hist(channels[r*8:r*8+64, c*8:c*8+64, 0], nbins=15, bins_range=(0,180))
-        cell_feat = channel_hog(channels[r*8:r*8+64, c*8:c*8+64, 1])
-        feat = np.concatenate([cell_hist, cell_feat]).reshape(1,-1)
-        scaled_feat = scaler.transform(feat)
-        pred = clf.predict(scaled_feat)
-        if pred:
-            results.append((\
-                    int(base_r+coord_scale*r*8),int(base_c+coord_scale*c*8), \
-                    int(base_r+coord_scale*r*8+64*coord_scale), int(base_c+coord_scale*c*8+64*coord_scale)))
-
-    return results
+#def detect_vehicles_single_scale(img, scaler, clf, cell_stride=2, \
+#        coord_scale=1.0, base_r=0, base_c=0, channeled=False):
+#    """
+#    img should be cropped and scaled 
+#    both dimension of the image should be multiples of 8
+#    the algorithm looks for windows of size 64x64 pixels
+#
+#    results is a list of tuples containing the upper left 
+#    corner of the vehicle windows
+#    """
+#    results = []
+#    if not channeled:
+#        channels = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
+#    else:
+#        channels = img
+#    ncells_per_window = 8
+#    max_row = (img.shape[0]//8)-ncells_per_window
+#    max_col = (img.shape[1]//8)-ncells_per_window
+#    for r,c in product(range(0,max_row,cell_stride), range(0,max_col,cell_stride)):
+#        cell_hist = channel_hist(channels[r*8:r*8+64, c*8:c*8+64, 0], nbins=15, bins_range=(0,180))
+#        cell_feat = channel_hog(channels[r*8:r*8+64, c*8:c*8+64, 1])
+#        feat = np.concatenate([cell_hist, cell_feat]).reshape(1,-1)
+#        scaled_feat = scaler.transform(feat)
+#        pred = clf.predict(scaled_feat)
+#        if pred:
+#            results.append((\
+#                    int(base_r+coord_scale*r*8),int(base_c+coord_scale*c*8), \
+#                    int(base_r+coord_scale*r*8+64*coord_scale), int(base_c+coord_scale*c*8+64*coord_scale)))
+#
+#    return results
 
 def perform_feature_extraction(hls, r, c, base_r, base_c, coord_scale):
     """ the location parameters are recorded for inferring boxes """
@@ -110,24 +110,11 @@ def perform_feature_extraction(hls, r, c, base_r, base_c, coord_scale):
     return np.concatenate([[base_r, base_c, r, c, coord_scale], cell_hist, cell_feat])
 
 def crop_and_hls(img, x):
-    return cv2.cvtColor(cv2.resize(img[360:x[0],:x[1],:], (x[3],x[2])), cv2.COLOR_BGR2HLS)
+    return cv2.cvtColor(cv2.resize(\
+            img[x[0]:x[2],x[1]:x[3],:], (x[5],x[4])), cv2.COLOR_BGR2HLS)
 
-def detect_vehicles_parallel(img, scaler, clf):
-    # crops always has top left (360,0)
-    # the first two numbers are the bottom right
-    # the next two are the dst size
-    # final number is cell_stride
+def detect_vehicles_from_crops(img, crop_list, scaler, clf):
     n_jobs = 8
-    crop_list = [\
-            #(464,1280, 208,2560, 4), \
-            (496,1280, 136,1280, 2), \
-            (560,1280, 150,960, 2), \
-            (592,1280, 145,800, 2), \
-            (656,1280, 148,640, 1), \
-            (656,1280, 111,480, 1), \
-            #(656,1280, 74,320, 1), \
-            ]
-    # size is (32,) 64, 85.33, 102.4, 128, 170.66, 256
     images = [crop_and_hls(img, x) for x in crop_list]
     # matrix to store extracted features
     features = []
@@ -138,7 +125,7 @@ def detect_vehicles_parallel(img, scaler, clf):
         cell_stride = cp[-1]
         features += Parallel(n_jobs=n_jobs)(\
                 delayed(perform_feature_extraction)(\
-                image, r, c, 360, 0, (cp[0]-360)/cp[2]) \
+                image, r, c, cp[0], cp[1], (cp[2]-cp[0])/cp[4]) \
                 for r,c in product(\
                 range(0,max_row,cell_stride), \
                 range(0,max_col,cell_stride)))
@@ -158,6 +145,39 @@ def detect_vehicles_parallel(img, scaler, clf):
             results[:,1]+results[:,3]*results[:,4]*8+results[:,4]*64], \
             axis=1).astype(np.int)
     return list(results)
+
+def detect_vehicles_parallel(img, scaler, clf):
+    # crops always has top left (360,0)
+    # the first two numbers are coordinate of top left
+    # followed by coordinates of bottom right
+    # the next two are the dst size
+    # final number is cell_stride
+    crop_list = [\
+            #(464,1280, 208,2560, 4), \
+            (360,0, 496,1280, 136,1280, 2), \
+            (360,0, 560,1280, 150,960, 2), \
+            (360,0, 592,1280, 145,800, 2), \
+            (360,0, 656,1280, 148,640, 1), \
+            (360,0, 656,1280, 111,480, 1), \
+            #(656,1280, 74,320, 1), \
+            ]
+    # size is (32,) 64, 85.33, 102.4, 128, 170.66, 256
+    return detect_vehicles_from_crops(img, crop_list, scaler, clf)
+
+def detect_vehicles_in_boxes_parallel(img, boxes, scaler, clf):
+    # each tuple correspond to one scaling setting
+    # first two are the top and bottom row number
+    # third is the scaling factor
+    # last is cell_stride
+    row_range = [\
+            (360,496,1.,2), \
+            (360,560,4/3,2), \
+            (360,592,1.6,2), \
+            (360,656,2.,1), \
+            (360,656,8/3,1)]
+
+
+    return detect_vehicles_from_crops(img, crop_list, scaler, clf)
 
 def get_heatmap(shape, boxes, thresh):
     if len(shape) == 2:
