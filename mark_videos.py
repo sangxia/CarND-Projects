@@ -84,7 +84,7 @@ scaler, clf = joblib.load(model_fname + '_scaler.pickle'), \
 states = {\
         'initial_phase': 6, \
         'count_down': 0, \
-        'reset': 24, \
+        'reset': 48, \
         'border_region': [(360,960,656,1280),(360,0,656,320)], \
         'discount': 0.9, \
         'thresh_frame_count': 3, \
@@ -93,7 +93,8 @@ states = {\
 #fname = 'test_video.mp4'
 fname = 'project_video.mp4'
 clip1 = VideoFileClip(fname)
-clip2 = clip1.subclip(25.,45.).fl_image(lambda img: \
+clip2 = clip1.\
+        fl_image(lambda img: \
         process_image(img[:,:,::-1], scaler, clf, states))
 clip2.write_videofile('output_'+fname, audio=False)
 
