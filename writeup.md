@@ -113,3 +113,4 @@ I now discuss some of the issues / limitations of my pipeline.
 
 * Classifier performance. Through validation, I decided on a model that achieved about 0.995 accuracy on the given dataset. However, given that we are making a lot of predictions over many frames, even a 0.5% error rate can be problematic. Going through `log_project_video.txt`, I can see that there are quite a few instances of false positives and negatives. Most of them are filtered so they did not affect the final output too much, but I think it would be beneficial to collect these failures and train a better classifier.
 
+* Lighting conditions. The current pipeline uses only L channel from HLS. If the lighting condition is such that the shape of the vehicles are not clear in the L channel, I expect the detection performance to drop.

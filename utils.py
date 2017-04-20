@@ -162,7 +162,8 @@ def box_area(box):
         return (box[3]-box[1])*(box[2]-box[0])
 
 def iou(b1, b2):
-    return box_area(box_intersection(b1, b2))/box_area(box_union(b1, b2))
+    area_intersection = box_area(box_intersection(b1, b2))
+    return area_intersection/(box_area(b1)+box_area(b2)-area_intersection)
 
 def iomin(b1, b2):
     return box_area(box_intersection(b1, b2))/min(box_area(b1), box_area(b2))
