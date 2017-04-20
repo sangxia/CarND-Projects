@@ -34,28 +34,6 @@ def channel_hog_cv2(img, hd):
 def channel_hist(img, nbins=32, bins_range=(0, 256)):
     return np.histogram(img, bins=nbins, range=bins_range)[0]
 
-#def get_features(img, hd=None):
-#    """
-#    takes as input img in BGR format, outputs a concatenated
-#    feature containing hog of the relevant channels and histogram
-#    of the hue channel
-#    """
-#    features = []
-#    # obtain the relevant channels
-#    y = cv2.cvtColor(img, cv2.COLOR_BGR2YCrCb)[:,:,0]
-#    h, l, s_hls = np.dsplit(cv2.cvtColor(img, cv2.COLOR_BGR2HLS), 3)
-#    s_hsv, v = np.dsplit(cv2.cvtColor(img, cv2.COLOR_BGR2HSV)[:,:,1:], 2)
-#    b, g, r = np.dsplit(img, 3)
-#    # histogram of hue channel
-#    features.append(channel_hist(h, nbins=15, bins_range=(0,180)))
-#    # hog for other channels
-#    for ch in [y, l, s_hls, s_hsv, v, b, g, r]:
-#        if len(ch.shape) == 2:
-#            features.append(channel_hog(ch,hd=hd))
-#        else:
-#            features.append(channel_hog(ch[:,:,0],hd=hd))
-#    return np.concatenate(features)
-
 def get_features_cv2(img, hd):
     """
     takes as input img in BGR format, outputs a concatenated
@@ -77,12 +55,6 @@ def get_features_cv2(img, hd):
         else:
             features.append(channel_hog_cv2(ch[:,:,0],hd))
     return np.concatenate(features)
-
-#def perform_feature_extraction(hls, r, c, base_r, base_c, coord_scale):
-#    """ the location parameters are recorded for inferring boxes """
-#    cell_hist = channel_hist(hls[r*8:r*8+64, c*8:c*8+64, 0], nbins=15, bins_range=(0,180))
-#    cell_feat = channel_hog_cv2(hls[r*8:r*8+64, c*8:c*8+64, 1], margin=False)
-#    return np.concatenate([[base_r, base_c, r, c, coord_scale], cell_hist, cell_feat])
 
 def perform_feature_extraction_cv2(hls, img_hog, r, c, base_r, base_c, coord_scale):
     """ the location parameters are recorded for inferring boxes """
