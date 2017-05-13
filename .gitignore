@@ -1,6 +1,9 @@
 # silly macOS
 .DS_Store
 
+# vim swp
+*.swp
+
 # build files
 build/
 
