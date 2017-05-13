@@ -26,6 +26,10 @@ public:
   */
   void ProcessMeasurement(const MeasurementPackage &measurement_pack);
 
+  void Reset() { is_initialized_ = false; }
+
+  long long getPreviousTimestamp() { return previous_timestamp_; }
+
   /**
   * Kalman Filter update and prediction math lives in here.
   */

@@ -57,7 +57,6 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
     // first measurement
     cout << "EKF: " << endl;
     ekf_.x_ = VectorXd(4);
-    ekf_.x_ << 1, 1, 1, 1;
 
     if (measurement_pack.sensor_type_ == MeasurementPackage::RADAR) {
       /**
@@ -79,9 +78,11 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
       ekf_.P_(3,3) = 1000;
     }
     ekf_.F_ = Matrix<double, 4, 4>::Identity();
-    ekf_.Q_ = MatrixXd(4,4);
+    ekf_.Q_ = MatrixXd::Constant(4,4,0);
     
     previous_timestamp_ = measurement_pack.timestamp_;
+    cout << "I x_ = " << ekf_.x_ << endl;
+    // cout << "P P_ = " << ekf_.P_ << endl;
 
     // done initializing, no need to predict or update
     is_initialized_ = true;
@@ -99,9 +100,13 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
      * Use noise_ax = 9 and noise_ay = 9 for your Q matrix.
    */
   double dt = (measurement_pack.timestamp_ - previous_timestamp_) * 1e-6;
+  // cout << "dt = " << dt << endl;
   ekf_.UpdateF(dt);
   ekf_.UpdateQ(dt);
   ekf_.Predict();
+
+  // cout << "P x_ = " << ekf_.x_ << endl;
+  // cout << "P P_ = " << ekf_.P_ << endl;
 
   /*****************************************************************************
    *  Update
@@ -125,8 +130,9 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
   }
 
   // print the output
-  cout << "x_ = " << ekf_.x_ << endl;
-  cout << "P_ = " << ekf_.P_ << endl;
+  cout << "M x_ = " << ekf_.x_.transpose() << endl;
+  // cout << "M P_ = " << ekf_.P_ << endl;
 
   previous_timestamp_ = measurement_pack.timestamp_;
 }
+
