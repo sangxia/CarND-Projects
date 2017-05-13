@@ -35,6 +35,10 @@ public:
    */
   virtual ~KalmanFilter();
 
+  void UpdateF(double dt);
+
+  void UpdateQ(double dt);
+
   /**
    * Init Initializes Kalman filter
    * @param x_in Initial state

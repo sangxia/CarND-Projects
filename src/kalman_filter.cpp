@@ -14,6 +14,29 @@ KalmanFilter::KalmanFilter() {
 
 KalmanFilter::~KalmanFilter() {}
 
+void KalmanFilter::UpdateF(double dt) {
+  F_(0, 2) = dt;
+  F_(1, 3) = dt;
+}
+
+void KalmanFilter::UpdateQ(double dt) {
+  double noise_ax = 9;
+  double noise_ay = 9;
+
+  double dt_2 = dt*dt;
+  double dt_3 = dt_2*dt;
+  double dt_4 = dt_3*dt;
+
+  Q_(0, 0) = dt_4/4*noise_ax;
+  Q_(0, 2) = dt_3/2*noise_ax;
+  Q_(1, 1) = dt_4/4*noise_ay;
+  Q_(1, 3) = dt_3/2*noise_ay;
+  Q_(2, 0) = dt_3/2*noise_ax;
+  Q_(2, 2) = dt_2*noise_ax;
+  Q_(3, 1) = dt_3/2*noise_ay;
+  Q_(3, 3) = dt_2*noise_ay;
+}
+
 void KalmanFilter::Init(VectorXd &x_in, MatrixXd &P_in, MatrixXd &F_in,
                         MatrixXd &H_in, MatrixXd &R_in, MatrixXd &Q_in) {
   x_ = x_in;
@@ -70,15 +93,12 @@ void KalmanFilter::UpdateRadar(const VectorXd &z) {
   double uy = sin(x_polar(1));
   x_polar(2) = ux*x_(2) + uy*x_(3);
   VectorXd y = z - x_polar;
-  cout << "z = " << z << endl;
-  cout << "xpolar = " << x_polar << endl;
   while (y(1) < -M_PI-1e-3) {
     y(1) += 2*M_PI;
   }
   while (y(1) > M_PI+1e-3) {
     y(1) -= 2*M_PI;
   }
-  cout << "y = " << y << endl;
   H_(0,0) = cos(x_polar(1));
   H_(0,1) = sin(x_polar(1));
   H_(2,2) = H_(0,0);
@@ -98,10 +118,5 @@ void KalmanFilter::UpdateRadar(const VectorXd &z) {
   MatrixXd K = P_ * Ht * S.inverse();
   x_ = x_ + K*y;
   P_ = (I4 - K*H_) * P_;
-
-  VectorXd zp(4);
-  zp << z(0)*cos(z(1)), z(0)*sin(z(1)), z(2)*cos(z(1)), z(2)*sin(z(1));
-  cout << "xadj = " << x_ << endl;
-  cout << "zp = " << zp << endl;
 }
 
