@@ -1,17 +1,17 @@
+#include <stdlib.h>
+#include <math.h>
+#include <string.h>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <vector>
-#include <stdlib.h>
+#include <uWS/uWS.h>
+#include "json.hpp"
 #include "Eigen/Dense"
 #include "FusionEKF.h"
 #include "ground_truth_package.h"
 #include "measurement_package.h"
-#include <uWS/uWS.h>
-#include <math.h>
-#include "json.hpp"
 #include "tools.h"
-#include <string.h>
 
 enum class Modes { File, Socket };
 
@@ -40,8 +40,7 @@ std::string hasData(std::string s) {
   auto b2 = s.find_first_of("]");
   if (found_null != std::string::npos) {
     return "";
-  }
-  else if (b1 != std::string::npos && b2 != std::string::npos) {
+  } else if (b1 != std::string::npos && b2 != std::string::npos) {
     return s.substr(b1, b2 - b1 + 1);
   }
   return "";
@@ -105,11 +104,9 @@ Param check_arguments(int argc, char* argv[]) {
       cerr << "Please specify either file or socket.\n" << usage_instructions <<endl;
     }
   }
-
   if (!has_valid_args) {
     exit(EXIT_FAILURE);
   }
-
   return ret;
 }
 
@@ -119,27 +116,25 @@ void check_files(ifstream& in_file, string& in_name,
     cerr << "Cannot open input file: " << in_name << endl;
     exit(EXIT_FAILURE);
   }
-
   if (!out_file.is_open()) {
     cerr << "Cannot open output file: " << out_name << endl;
     exit(EXIT_FAILURE);
   }
 }
 
-void processFile(string in_file_name_, string out_file_name_, bool useLidar, bool useRadar) {
+void processFile(string in_file_name_, string out_file_name_, 
+                 bool useLidar, bool useRadar) {
   ifstream in_file_(in_file_name_.c_str(), ifstream::in);
   ofstream out_file_(out_file_name_.c_str(), ofstream::out);
   check_files(in_file_, in_file_name_, out_file_, out_file_name_);
 
   vector<MeasurementPackage> measurement_pack_list;
   vector<GroundTruthPackage> gt_pack_list;
-
   string line;
 
   // prep the measurement packages (each line represents a measurement at a
   // timestamp)
   while (getline(in_file_, line)) {
-
     string sensor_type;
     MeasurementPackage meas_package;
     GroundTruthPackage gt_package;
@@ -149,9 +144,8 @@ void processFile(string in_file_name_, string out_file_name_, bool useLidar, boo
 
     // reads first element from the current line
     iss >> sensor_type;
-    if (useLidar && (sensor_type.compare("L") == 0)) {
+    if (sensor_type.compare("L") == 0) {
       // LASER MEASUREMENT
-
       // read measurements at this timestamp
       meas_package.sensor_type_ = MeasurementPackage::LASER;
       meas_package.raw_measurements_ = VectorXd(2);
@@ -162,11 +156,12 @@ void processFile(string in_file_name_, string out_file_name_, bool useLidar, boo
       meas_package.raw_measurements_ << x, y;
       iss >> timestamp;
       meas_package.timestamp_ = timestamp;
-      measurement_pack_list.push_back(meas_package);
-      push = true;
-    } else if (useRadar && (sensor_type.compare("R") == 0)) {
+      if (useLidar) {
+        measurement_pack_list.push_back(meas_package);
+        push = true;
+      }
+    } else if (sensor_type.compare("R") == 0) {
       // RADAR MEASUREMENT
-
       // read measurements at this timestamp
       meas_package.sensor_type_ = MeasurementPackage::RADAR;
       meas_package.raw_measurements_ = VectorXd(3);
@@ -179,10 +174,11 @@ void processFile(string in_file_name_, string out_file_name_, bool useLidar, boo
       meas_package.raw_measurements_ << ro, phi, ro_dot;
       iss >> timestamp;
       meas_package.timestamp_ = timestamp;
-      measurement_pack_list.push_back(meas_package);
-      push = true;
+      if (useRadar) {
+        measurement_pack_list.push_back(meas_package);
+        push = true;
+      }
     }
-
     // read ground truth data to compare later
     float x_gt;
     float y_gt;
@@ -201,24 +197,20 @@ void processFile(string in_file_name_, string out_file_name_, bool useLidar, boo
 
   // Create a Fusion EKF instance
   FusionEKF fusionEKF;
-
   // used to compute the RMSE later
   vector<VectorXd> estimations;
   vector<VectorXd> ground_truth;
-
   //Call the EKF-based fusion
   size_t N = measurement_pack_list.size();
   for (size_t k = 0; k < N; ++k) {
     // start filtering from the second frame (the speed is unknown in the first
     // frame)
     fusionEKF.ProcessMeasurement(measurement_pack_list[k]);
-
     // output the estimation
     out_file_ << fusionEKF.ekf_.x_(0) << "\t";
     out_file_ << fusionEKF.ekf_.x_(1) << "\t";
     out_file_ << fusionEKF.ekf_.x_(2) << "\t";
     out_file_ << fusionEKF.ekf_.x_(3) << "\t";
-
     // output the measurements
     if (measurement_pack_list[k].sensor_type_ == MeasurementPackage::LASER) {
       // output the estimation
@@ -231,40 +223,32 @@ void processFile(string in_file_name_, string out_file_name_, bool useLidar, boo
       out_file_ << ro * cos(phi) << "\t"; // p1_meas
       out_file_ << ro * sin(phi) << "\t"; // ps_meas
     }
-
     // output the ground truth packages
     out_file_ << gt_pack_list[k].gt_values_(0) << "\t";
     out_file_ << gt_pack_list[k].gt_values_(1) << "\t";
     out_file_ << gt_pack_list[k].gt_values_(2) << "\t";
     out_file_ << gt_pack_list[k].gt_values_(3) << "\n";
-
     estimations.push_back(fusionEKF.ekf_.x_);
     ground_truth.push_back(gt_pack_list[k].gt_values_);
   }
-
   // compute the accuracy (RMSE)
   Tools tools;
   cout << "Accuracy - RMSE:" << endl << tools.CalculateRMSE(estimations, ground_truth) << endl;
   cout << "Accuracy 2 - RMSE:" << endl << tools.CalculateRMSE(estimations, ground_truth, 20) << endl;
-
   // close files
   if (out_file_.is_open()) {
     out_file_.close();
   }
-
   if (in_file_.is_open()) {
     in_file_.close();
   }
-
   return;
 }
 
 void processSocket() {
   uWS::Hub h;
-
   // Create a Kalman Filter instance
   FusionEKF fusionEKF;
-
   // used to compute the RMSE later
   Tools tools;
   vector<VectorXd> estimations;
@@ -277,25 +261,19 @@ void processSocket() {
     // The 2 signifies a websocket event
 
     if (length && length > 2 && data[0] == '4' && data[1] == '2') {
-
       auto s = hasData(std::string(data));
       if (s != "") {
         auto j = json::parse(s);
         std::string event = j[0].get<std::string>();
-        
         if (event == "telemetry") {
           // j[1] is the data JSON object
-          
           string sensor_measurment = j[1]["sensor_measurement"];
-          
           MeasurementPackage meas_package;
           istringstream iss(sensor_measurment);
           long long timestamp;
-
           // reads first element from the current line
           string sensor_type;
           iss >> sensor_type;
-
           if (sensor_type.compare("L") == 0) {
             meas_package.sensor_type_ = MeasurementPackage::LASER;
             meas_package.raw_measurements_ = VectorXd(2);
@@ -340,28 +318,22 @@ void processSocket() {
           gt_values(2) = vx_gt;
           gt_values(3) = vy_gt;
           ground_truth.push_back(gt_values);
-          
           // Call ProcessMeasurment(meas_package) for Kalman filter
           fusionEKF.ProcessMeasurement(meas_package);          
 
           //Push the current estimated x,y positon from the Klaman filter's state vector
-
           VectorXd estimate(4);
-
           double p_x = fusionEKF.ekf_.x_(0);
           double p_y = fusionEKF.ekf_.x_(1);
           double v1  = fusionEKF.ekf_.x_(2);
           double v2 = fusionEKF.ekf_.x_(3);
-
           estimate(0) = p_x;
           estimate(1) = p_y;
           estimate(2) = v1;
           estimate(3) = v2;
-          
           estimations.push_back(estimate);
 
           VectorXd RMSE = tools.CalculateRMSE(estimations, ground_truth);
-
           json msgJson;
           msgJson["estimate_x"] = p_x;
           msgJson["estimate_y"] = p_y;
@@ -372,30 +344,24 @@ void processSocket() {
           auto msg = "42[\"estimate_marker\"," + msgJson.dump() + "]";
           // std::cout << msg << std::endl;
           ws->send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-      
         }
         else {
           cout << event << endl;
         }
       } else {
-        
         std::string msg = "42[\"manual\",{}]";
         ws->send(msg.data(), msg.length(), uWS::OpCode::TEXT);
       }
     }
-
   }));
 
   // We don't need this since we're not using HTTP but if it's removed the program
   // doesn't compile :-(
   h.onHttpRequest([](uWS::HttpResponse *res, uWS::HttpRequest req, char *data, size_t, size_t) {
     const std::string s = "<h1>Hello world!</h1>";
-    if (req.getUrl().valueLength == 1)
-    {
+    if (req.getUrl().valueLength == 1) {
       res->end(s.data(), s.length());
-    }
-    else
-    {
+    } else {
       // i guess this should be done more gracefully?
       res->end(nullptr, 0);
     }
@@ -413,12 +379,9 @@ void processSocket() {
   }));
 
   int port = 4567;
-  if (h.listen(port))
-  {
+  if (h.listen(port)) {
     std::cout << "Listening to port " << port << std::endl;
-  }
-  else
-  {
+  } else {
     std::cerr << "Failed to listen to port" << std::endl;
     return;
   }
@@ -426,15 +389,12 @@ void processSocket() {
 }
 
 int main(int argc, char* argv[]) {
-
   Param param = check_arguments(argc, argv);
-
   if (param.mode == Modes::File) {
     processFile(param.infile, param.outfile, param.Lidar, param.Radar);
   } else if (param.mode == Modes::Socket) {
     processSocket();
   }
-
   return 0;
 }
 

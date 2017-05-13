@@ -1,5 +1,5 @@
-#include <iostream>
 #include <math.h>
+#include <iostream>
 #include "tools.h"
 
 using Eigen::VectorXd;
@@ -20,7 +20,7 @@ VectorXd Tools::CalculateRMSE(const vector<VectorXd> &estimations,
   VectorXd res = VectorXd::Constant(estimations[0].size(), 0.0);
   for (int i=start; i<size; i++) {
     VectorXd err = estimations[i]-ground_truth[i];
-    err = err.array() * err.array();
+    err = err.array()*err.array();
     res += err;
   }
   res = res/size;
