@@ -1,7 +1,38 @@
 # Unscented Kalman Filter Project Starter Code
-Self-Driving Car Engineer Nanodegree Program
 
----
+Use Unscented Kalman Filter to estimate the state of a moving object of interest with noisy lidar and radar measurements.
+
+## Command line interface
+
+The format is `./UnscentedKF [-l] [-r] <path/to/input> <path/to/output>`.
+Use `-l` and `-r` to *exclude* lidar or radar measurements.
+
+I also implemented `check_nis.py` to compare the NIS values from the output
+file with the reference values. The interface is 
+`check_nis.py <path/to/ukfoutputfile>`
+
+## Results
+
+The following uses `std_a_=3` and `std_yawdd_=0.4`.
+The reference values are 
+`L .05 = 0.103`,
+`L .95 = 5.991`,
+`R .05 = 0.352`,
+`R .95 = 7.815`.
+
+| Source         | RMSE px | RMSE py | RMSE vx | RMSE vy | L .05 | L .95 | R .05 | R .95 |
+|:-------------- | -------:| -------:| -------:| -------:| -----:| -----:| -----:| -----:|
+| Lidar+Radar    |  0.0750 |  0.0826 |  0.3462 |  0.2632 | 0.111 | 4.942 | 0.294 | 7.187 |
+| Lidar only     |  0.1082 |  0.0958 |  0.5073 |  0.2701 | 0.088 | 5.790 |       |       |
+| Radar only     |  0.1775 |  0.2856 |  0.3624 |  0.6798 |       |       | 0.295 | 8.847 |
+
+Increasing the process noise standard deviations decreases the 
+quantile values, and vice versa. 
+
+Compared with results from 
+[my EKF implementation](https://github.com/sangxia/CarND-Extended-Kalman-Filter-Project), 
+results from UKF are in general much better, although the improvements seems larger
+for x-axis than y-axis, and RMSE py for Radar only got slightly worse.
 
 ## Dependencies
 
@@ -9,38 +40,7 @@ Self-Driving Car Engineer Nanodegree Program
 * make >= v4.1
 * gcc/g++ >= v5.4
 
-## Basic Build Instructions
+For `check_nis.py`:
+* python >= 3.5
+* pandas
 
-1. Clone this repo.
-2. Make a build directory: `mkdir build && cd build`
-3. Compile: `cmake .. && make`
-4. Run it: `./UnscentedKF path/to/input.txt path/to/output.txt`. You can find
-   some sample inputs in 'data/'.
-    - eg. `./UnscentedKF ../data/obj_pose-laser-radar-synthetic-input.txt`
-
-## Editor Settings
-
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
-
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
-
-## Code Style
-
-Please stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html) as much as possible.
-
-## Generating Additional Data
-
-This is optional!
-
-If you'd like to generate your own radar and lidar data, see the
-[utilities repo](https://github.com/udacity/CarND-Mercedes-SF-Utilities) for
-Matlab scripts that can generate additional data.
-
-## Project Instructions and Rubric
-
-This information is only accessible by people who are already enrolled in Term 2
-of CarND. If you are enrolled, see [the project page](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/c3eb3583-17b2-4d83-abf7-d852ae1b9fff/concepts/f437b8b0-f2d8-43b0-9662-72ac4e4029c1)
-for instructions and the project rubric.

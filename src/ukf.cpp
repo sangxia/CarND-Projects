@@ -55,7 +55,7 @@ UKF::UKF() {
   std_a_ = 3;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 0.3;
+  std_yawdd_ = 0.4;
 
 }
 
@@ -177,6 +177,8 @@ void UKF::Prediction(double delta_t) {
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
     while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
     while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
+    while (x_diff(4)> M_PI) x_diff(4)-=2.*M_PI;
+    while (x_diff(4)<-M_PI) x_diff(4)+=2.*M_PI;
     P_ = P_ + weights_(i) * x_diff * x_diff.transpose();
   }
 }
@@ -209,7 +211,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   //update state mean and covariance matrix
   x_ = x_ + K * z_diff;
   P_ = P_ - K*S*K.transpose();
-  NIS_radar_ = z_diff.transpose() * S.inverse() * z_diff;
+  NIS_laser_ = z_diff.transpose() * S.inverse() * z_diff;
 }
 
 /**
@@ -228,13 +230,6 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
     double vy = sin(yaw)*v;
     Zsig(0,i) = sqrt(p_x*p_x + p_y*p_y);                        //r
     Zsig(1,i) = atan2(p_y,p_x);                                 //phi
-    if (p_x < 0) {
-      if (p_y > 0) {
-        Zsig(1,i) += M_PI;
-      } else {
-        Zsig(1,i) -= M_PI;
-      }
-    }
     Zsig(2,i) = vx*cos(Zsig(1,i)) + vy*sin(Zsig(1,i));   //r_dot
   }
   // prediction mean and covariance
@@ -251,6 +246,8 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
     while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
     while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
+    while (x_diff(4)> M_PI) x_diff(4)-=2.*M_PI;
+    while (x_diff(4)<-M_PI) x_diff(4)+=2.*M_PI;
     Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
   }
   //add measurement noise covariance matrix
@@ -266,6 +263,6 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   //update state mean and covariance matrix
   x_ = x_ + K * z_diff;
   P_ = P_ - K*S*K.transpose();
-  NIS_laser_ = z_diff.transpose() * S.inverse() * z_diff;
+  NIS_radar_ = z_diff.transpose() * S.inverse() * z_diff;
 }
 

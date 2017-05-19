@@ -14,27 +14,55 @@ using Eigen::MatrixXd;
 using Eigen::VectorXd;
 using std::vector;
 
-void check_arguments(int argc, char* argv[]) {
-  string usage_instructions = "Usage instructions: ";
+struct Param {
+  bool Radar;
+  bool Lidar;
+  string infile;
+  string outfile;
+};
+
+Param check_arguments(int argc, char* argv[]) {
+  string usage_instructions = "Usage instructions: \n";
   usage_instructions += argv[0];
-  usage_instructions += " path/to/input.txt output.txt";
+  usage_instructions += " [-l] [-r] path/to/input.txt path/to/output.txt";
 
   bool has_valid_args = false;
+  Param ret;
+  ret.Radar = true;
+  ret.Lidar = true;
 
   // make sure the user has provided input and output files
-  if (argc == 1) {
-    cerr << usage_instructions << endl;
-  } else if (argc == 2) {
-    cerr << "Please include an output file.\n" << usage_instructions << endl;
-  } else if (argc == 3) {
-    has_valid_args = true;
-  } else if (argc > 3) {
-    cerr << "Too many arguments.\n" << usage_instructions << endl;
+  if (argc < 3) {
+    cerr << "Missing arguments.\n" << usage_instructions << endl;
+  } else {
+    if (strcmp(argv[1], "-l")==0 || strcmp(argv[2], "-l")==0) {
+      cout << "Lidar off" << endl;
+      ret.Lidar = false;
+    }
+    if (strcmp(argv[1], "-r")==0 || strcmp(argv[2], "-r")==0) {
+      cout << "Radar off" << endl;
+      ret.Radar = false;
+    }
+    if (!(ret.Lidar || ret.Radar)) {
+      cerr << "Lidar and Radar cannot both be off.\n" << endl;
+    } else {
+      int n_switches = 2 - (ret.Lidar + ret.Radar);
+      if (argc < 3+n_switches) {
+        cerr << "Missing arguments.\n" << usage_instructions << endl;
+      } else if (argc > 3+n_switches) {
+        cerr << "Too many arguments.\n" << usage_instructions << endl;
+      } else {
+        has_valid_args = true;
+        ret.infile = argv[1+n_switches];
+        ret.outfile = argv[2+n_switches];
+      }
+    }
   }
 
   if (!has_valid_args) {
     exit(EXIT_FAILURE);
   }
+  return ret;
 }
 
 void check_files(ifstream& in_file, string& in_name,
@@ -52,12 +80,12 @@ void check_files(ifstream& in_file, string& in_name,
 
 int main(int argc, char* argv[]) {
 
-  check_arguments(argc, argv);
+  Param param = check_arguments(argc, argv);
 
-  string in_file_name_ = argv[1];
+  string in_file_name_ = param.infile;
   ifstream in_file_(in_file_name_.c_str(), ifstream::in);
 
-  string out_file_name_ = argv[2];
+  string out_file_name_ = param.outfile;
   ofstream out_file_(out_file_name_.c_str(), ofstream::out);
 
   check_files(in_file_, in_file_name_, out_file_, out_file_name_);
@@ -83,6 +111,8 @@ int main(int argc, char* argv[]) {
     // reads first element from the current line
     iss >> sensor_type;
 
+    bool pushgt = false;
+
     if (sensor_type.compare("L") == 0) {
       // laser measurement
 
@@ -96,7 +126,10 @@ int main(int argc, char* argv[]) {
       meas_package.raw_measurements_ << px, py;
       iss >> timestamp;
       meas_package.timestamp_ = timestamp;
-      measurement_pack_list.push_back(meas_package);
+      if (param.Lidar) {
+        measurement_pack_list.push_back(meas_package);
+        pushgt = true;
+      }
     } else if (sensor_type.compare("R") == 0) {
       // radar measurement
 
@@ -112,7 +145,10 @@ int main(int argc, char* argv[]) {
       meas_package.raw_measurements_ << ro, phi, ro_dot;
       iss >> timestamp;
       meas_package.timestamp_ = timestamp;
-      measurement_pack_list.push_back(meas_package);
+      if (param.Radar) {
+        measurement_pack_list.push_back(meas_package);
+        pushgt = true;
+      }
     }
 
       // read ground truth data to compare later
@@ -126,7 +162,9 @@ int main(int argc, char* argv[]) {
       iss >> vy_gt;
       gt_package.gt_values_ = VectorXd(4);
       gt_package.gt_values_ << x_gt, y_gt, vx_gt, vy_gt;
-      gt_pack_list.push_back(gt_package);
+      if (pushgt) {
+        gt_pack_list.push_back(gt_package);
+      }
   }
 
   // Create a UKF instance
