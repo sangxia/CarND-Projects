@@ -32,6 +32,9 @@ public:
   ///* predicted sigma points matrix
   MatrixXd Xsig_pred_;
 
+  // sqrt(n_aug+lambda), the coefficient for matrix A
+  double Acoeff_;
+
   ///* time when the state is true, in us
   long long time_us_;
 
@@ -108,6 +111,11 @@ public:
    * @param meas_package The measurement at k+1
    */
   void UpdateRadar(MeasurementPackage meas_package);
+
+  // helper functions
+  double get_nu_a(int i);
+
+  double get_yawdd(int i);
 };
 
 #endif /* UKF_H */
