@@ -26,3 +26,10 @@ VectorXd Tools::CalculateRMSE(const vector<VectorXd> &estimations,
   return res.array().sqrt();
 
 }
+
+double Tools::NormalizeAngle(double r) {
+  while (r > M_PI) r -= 2.*M_PI;
+  while (r < -M_PI) r += 2.*M_PI;
+  return r;
+}
+

@@ -23,6 +23,8 @@ public:
       const std::vector<Eigen::VectorXd> &ground_truth,
       int start = 0);
 
+  double NormalizeAngle(double r);
+
 };
 
 #endif /* TOOLS_H_ */

@@ -59,6 +59,8 @@ public:
   ///* Radar measurement noise standard deviation radius change in m/s
   double std_radrd_ ;
 
+  Tools tools_;
+
   ///* Weights of sigma points
   VectorXd weights_;
 
@@ -67,6 +69,9 @@ public:
 
   ///* Augmented state dimension
   int n_aug_;
+
+  ///* Number of sigma points
+  int n_sig_;
 
   ///* Sigma point spreading parameter
   double lambda_;
