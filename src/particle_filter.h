@@ -9,10 +9,10 @@
 #ifndef PARTICLE_FILTER_H_
 #define PARTICLE_FILTER_H_
 
+#include <random>
 #include "helper_functions.h"
 
 struct Particle {
-
 	int id;
 	double x;
 	double y;
@@ -20,28 +20,32 @@ struct Particle {
 	double weight;
 };
 
-
-
 class ParticleFilter {
-	
 	// Number of particles to draw
 	int num_particles; 
 	
-	
-	
 	// Flag, if filter is initialized
 	bool is_initialized;
-	
+
 	// Vector of weights of all particles
-	std::vector<double> weights;
-	
-public:
-	
+	// std::vector<double> weights;
+
 	// Set of current particles
 	std::vector<Particle> particles;
 
+  default_random_engine gen;
+
+  // standard gaussian, used to add noise
+  normal_distribution<double> std_gaussian(0, 1);
+
+  // uniform distribution
+  uniform_int_distribution<int> uniform_dist;
+
+  uniform_real_distribution<int> uniform(0.0, 1.0);
+
+public:
+
 	// Constructor
-	// @param M Number of particles
 	ParticleFilter() : num_particles(0), is_initialized(false) {}
 
 	// Destructor
@@ -53,17 +57,18 @@ public:
 	 * @param x Initial x position [m] (simulated estimate from GPS)
 	 * @param y Initial y position [m]
 	 * @param theta Initial orientation [rad]
-	 * @param std[] Array of dimension 3 [standard deviation of x [m], standard deviation of y [m]
-	 *   standard deviation of yaw [rad]]
+	 * @param std[] Array of dimension 3 [standard deviation of x [m], 
+   *   standard deviation of y [m], standard deviation of yaw [rad]]
+   * @param num_p Number of particles to use
 	 */
-	void init(double x, double y, double theta, double std[]);
+	void init(double x, double y, double theta, double std[], int num_p = 1000);
 
 	/**
 	 * prediction Predicts the state for the next time step
 	 *   using the process model.
 	 * @param delta_t Time between time step t and t+1 in measurements [s]
-	 * @param std_pos[] Array of dimension 3 [standard deviation of x [m], standard deviation of y [m]
-	 *   standard deviation of yaw [rad]]
+	 * @param std_pos[] Array of dimension 3 [standard deviation of x [m], 
+   *  standard deviation of y [m], standard deviation of yaw [rad]]
 	 * @param velocity Velocity of car from t to t+1 [m/s]
 	 * @param yaw_rate Yaw rate of car from t to t+1 [rad/s]
 	 */
@@ -94,6 +99,11 @@ public:
 	 *   the new set of particles.
 	 */
 	void resample();
+
+  /**
+   * return the best particle
+   */
+  Particle getBestParticle();
 	
 	/*
 	 * write Writes particle positions to a file.
@@ -108,7 +118,5 @@ public:
 		return is_initialized;
 	}
 };
-
-
 
 #endif /* PARTICLE_FILTER_H_ */

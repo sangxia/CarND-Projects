@@ -1,3 +1,5 @@
+*.swp
+
 reviewer
 submission_instructions.*
 build
