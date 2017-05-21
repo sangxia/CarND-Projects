@@ -24,6 +24,8 @@ I made some changes to the interfaces, so `particle_filter.cpp` may not work wit
 official grader. The file `particle_filter_sub.cpp` is the one that is compatible with
 [the official version](https://github.com/udacity/CarND-Kidnapped-Vehicle-Project/commit/4829b0110f0eb91d4e677943007a806ba316e6d5).
 
+The following table shows error and runtime using different number of particles.
+
 | # Particles | x error | y error | yaw error | runtime (sec) |
 |:----------- | -------:| -------:| ---------:| -------------:|
 | 2           | 0.51303 | 0.43371 |   0.01618 |       0.09401 |
