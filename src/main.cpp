@@ -1,5 +1,8 @@
 #include <math.h>
+#include <string>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <uWS/uWS.h>
 #include "json.hpp"
 #include "PID.h"
@@ -28,17 +31,60 @@ std::string hasData(std::string s) {
   return "";
 }
 
-int main()
+int readParams(char* fname, double &Kp, double &Ki, double &Kd, double &speed_r,
+    double &speed_max, double &const_throttle) {
+  std::ifstream in_file(fname, std::ifstream::in);
+  if (!in_file) {
+    return -1;
+  }
+  std::string line;
+  std::string pname;
+  while (getline(in_file, line)) {
+    std::istringstream iss(line);
+    iss >> pname;
+    if (pname == "Kp") {
+      iss >> Kp;
+      std::cout << pname << " " << Kp << std::endl;
+    } else if (pname == "Ki") {
+      iss >> Ki;
+      std::cout << pname << " " << Ki << std::endl;
+    } else if (pname == "Kd") {
+      iss >> Kd;
+      std::cout << pname << " " << Kd << std::endl;
+    } else if (pname == "speed_r") {
+      iss >> speed_r;
+      std::cout << pname << " " << speed_r << std::endl;
+    } else if (pname == "speed_max") {
+      iss >> speed_max;
+      std::cout << pname << " " << speed_max << std::endl;
+    } else if (pname == "const_throttle") {
+      iss >> const_throttle;
+      std::cout << pname << " " << const_throttle << std::endl;
+    } else {
+      return -1;
+    }
+  }
+  return 0;
+}
+
+int main(int argc, char* argv[])
 {
   uWS::Hub h;
 
   PID pid;
-  double Kp = 0.12;
+  double Kp = 0.1;
   double Ki = 0.00001;
   double Kd = 2;
   double speed_r = 20;
   double speed_max = 60;
   double const_throttle = 1;
+  if (argc > 1) {
+    int ret = readParams(argv[1], Kp, Ki, Kd, speed_r, speed_max, const_throttle);
+    if (ret != 0) {
+      std::cout << "wrong parameters" << std::endl;
+      return -1;
+    }
+  }
   pid.init(Kp, Ki, Kd, speed_r, speed_max, const_throttle);
 
   h.onMessage(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>*, char*, size_t, uWS::OpCode)>>(

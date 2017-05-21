@@ -1,4 +1,5 @@
 #include <math.h>
+#include <cstring>
 #include <algorithm>
 #include "PID.h"
 
@@ -26,6 +27,7 @@ void PID::init(double Kp, double Ki, double Kd,
   i_error = 0;
   d_error = 0;
   i_error_buffer = new double[buffer_size];
+  std::memset(i_error_buffer, 0, buffer_size * sizeof(double));
 }
 
 void PID::updateError(double cte, double speed) {
@@ -48,7 +50,7 @@ void PID::updateError(double cte, double speed) {
       throttle_ctrl = 0.;
     }
     else {
-      throttle_ctrl = 0.3;
+      throttle_ctrl = 0.5;
     }
   }
 }
