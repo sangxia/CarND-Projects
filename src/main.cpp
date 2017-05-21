@@ -1,5 +1,4 @@
 #include <math.h>
-#include <algorithm>
 #include <iostream>
 #include <uWS/uWS.h>
 #include "json.hpp"
@@ -29,16 +28,18 @@ std::string hasData(std::string s) {
   return "";
 }
 
-double clip(double val) {
-  return std::min(1.0, std::max(-1.0, val));
-}
-
 int main()
 {
   uWS::Hub h;
 
   PID pid;
-  pid.init(0.1,0.00001,0.5);
+  double Kp = 0.12;
+  double Ki = 0.000005;
+  double Kd = 2;
+  double speed_r = 15;
+  double speed_max = 50;
+  double const_throttle = 0.5;
+  pid.init(Kp, Ki, Kd, speed_r, speed_max, const_throttle);
 
   h.onMessage(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>*, char*, size_t, uWS::OpCode)>>(
       [&pid](uWS::WebSocket<uWS::SERVER> *ws, char *data, size_t length, uWS::OpCode opCode) {
@@ -57,27 +58,17 @@ int main()
           double speed = std::stod(j[1]["speed"].get<std::string>());
           double angle = std::stod(j[1]["steering_angle"].get<std::string>());
           double steer_value;
-          double throttle = 0.3;
-          /*
-          * TODO: Calcuate steering value here, remember the steering value is
-          * [-1, 1].
-          * NOTE: Feel free to play around with the throttle and speed. Maybe use
-          * another PID controller to control the speed!
-          */
-          steer_value = pid.updateError(cte);
-          if (speed > 15) {
-            steer_value *= (speed / 15);
-          }
-          if (speed > 30) {
-            throttle = 0;
-          }
+          double throttle;
+          pid.updateError(cte, speed);
+          steer_value = pid.steer_ctrl;
+          throttle = pid.throttle_ctrl;
           
           // DEBUG
           std::cout << "CTE:\t" << cte << "\tD:\t" << pid.d_error << "\tI:\t" << pid.i_error
             << "\tSteer:\t" << steer_value << std::endl;
 
           json msgJson;
-          msgJson["steering_angle"] = clip(steer_value);
+          msgJson["steering_angle"] = steer_value;
           msgJson["throttle"] = throttle;
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
           // std::cout << msg << std::endl;

@@ -1,7 +1,14 @@
 #ifndef PID_H
 #define PID_H
 
+#include <algorithm>
+
 class PID {
+  
+  inline double clip_f(double val) {
+    return std::min(1.0, std::max(-1.0, val));
+  }
+
 public:
   /*
   * Errors
@@ -13,6 +20,13 @@ public:
   int buffer_size = 100;
   int buffer_ptr = 0;
   double *i_error_buffer = nullptr;
+
+  double speed_rate = 15;
+  double speed_limit = 60;
+  double normal_throttle = 0.5;
+
+  double steer_ctrl;
+  double throttle_ctrl;
 
   /*
   * Coefficients
@@ -34,13 +48,14 @@ public:
   /*
   * Initialize PID.
   */
-  void init(double Kp, double Ki, double Kd);
+  void init(double Kp, double Ki, double Kd, double speed_rate,
+      double speed, double throttle);
 
   /*
   * Update the PID error variables given cross track error.
   * Return a new steering angle
   */
-  double updateError(double cte);
+  void updateError(double cte, double speed);
 
 };
 

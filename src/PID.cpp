@@ -1,3 +1,5 @@
+#include <math.h>
+#include <algorithm>
 #include "PID.h"
 
 /*
@@ -12,22 +14,32 @@ PID::~PID() {
   }
 }
 
-void PID::init(double Kp, double Ki, double Kd) {
+void PID::init(double Kp, double Ki, double Kd,
+    double speed_rate, double speed, double throttle) {
   this->Kp = Kp;
   this->Ki = Ki;
   this->Kd = Kd;
+  this->speed_rate = speed_rate;
+  this->speed_limit = speed;
+  this->normal_throttle = throttle;
   p_error = 0;
   i_error = 0;
   d_error = 0;
   i_error_buffer = new double[buffer_size];
 }
 
-double PID::updateError(double cte) {
+void PID::updateError(double cte, double speed) {
   d_error = cte - p_error;
   i_error += (cte-i_error_buffer[buffer_ptr]);
   i_error_buffer[buffer_ptr] = cte;
   buffer_ptr = (buffer_ptr+1) % buffer_size;
   p_error = cte;
-  return -Kp*p_error - Kd*d_error - Ki*i_error;
+
+  steer_ctrl = -Kp*p_error - Kd*d_error - Ki*i_error;
+  if (speed > speed_rate) {
+    steer_ctrl *= sqrt(speed/speed_rate);
+  }
+  steer_ctrl = clip_f(steer_ctrl);
+  throttle_ctrl = (speed>speed_limit) ? 0 : normal_throttle;
 }
 
