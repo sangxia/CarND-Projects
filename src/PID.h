@@ -10,6 +10,10 @@ public:
   double i_error;
   double d_error;
 
+  int buffer_size = 100;
+  int buffer_ptr = 0;
+  double *i_error_buffer = nullptr;
+
   /*
   * Coefficients
   */ 

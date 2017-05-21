@@ -1,8 +1,9 @@
-#include <uWS/uWS.h>
+#include <math.h>
+#include <algorithm>
 #include <iostream>
+#include <uWS/uWS.h>
 #include "json.hpp"
 #include "PID.h"
-#include <math.h>
 
 // for convenience
 using json = nlohmann::json;
@@ -28,12 +29,16 @@ std::string hasData(std::string s) {
   return "";
 }
 
+double clip(double val) {
+  return std::min(1.0, std::max(-1.0, val));
+}
+
 int main()
 {
   uWS::Hub h;
 
   PID pid;
-  pid.init(0.1,0.0001,0.1);
+  pid.init(0.1,0.00001,0.5);
 
   h.onMessage(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>*, char*, size_t, uWS::OpCode)>>(
       [&pid](uWS::WebSocket<uWS::SERVER> *ws, char *data, size_t length, uWS::OpCode opCode) {
@@ -61,17 +66,21 @@ int main()
           */
           steer_value = pid.updateError(cte);
           if (speed > 15) {
+            steer_value *= (speed / 15);
+          }
+          if (speed > 30) {
             throttle = 0;
           }
           
           // DEBUG
-          std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
+          std::cout << "CTE:\t" << cte << "\tD:\t" << pid.d_error << "\tI:\t" << pid.i_error
+            << "\tSteer:\t" << steer_value << std::endl;
 
           json msgJson;
-          msgJson["steering_angle"] = steer_value;
+          msgJson["steering_angle"] = clip(steer_value);
           msgJson["throttle"] = throttle;
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
+          // std::cout << msg << std::endl;
           ws->send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
