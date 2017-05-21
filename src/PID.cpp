@@ -41,5 +41,15 @@ void PID::updateError(double cte, double speed) {
   }
   steer_ctrl = clip_f(steer_ctrl);
   throttle_ctrl = (speed>speed_limit) ? 0 : normal_throttle;
+  if (cte > 0.5 || steer_ctrl > 0.5) {
+    if (speed > 40) {
+      throttle_ctrl = -0.5;
+    } else if (speed > 15) {
+      throttle_ctrl = 0.;
+    }
+    else {
+      throttle_ctrl = 0.3;
+    }
+  }
 }
 

@@ -34,11 +34,11 @@ int main()
 
   PID pid;
   double Kp = 0.12;
-  double Ki = 0.000005;
+  double Ki = 0.00001;
   double Kd = 2;
-  double speed_r = 15;
-  double speed_max = 50;
-  double const_throttle = 0.5;
+  double speed_r = 20;
+  double speed_max = 60;
+  double const_throttle = 1;
   pid.init(Kp, Ki, Kd, speed_r, speed_max, const_throttle);
 
   h.onMessage(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>*, char*, size_t, uWS::OpCode)>>(
