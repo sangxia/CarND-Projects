@@ -6,7 +6,7 @@ public:
   /*
   * Errors
   */
-  double p_error;
+  double p_error; // this is the previous cte error
   double i_error;
   double d_error;
 
@@ -30,17 +30,14 @@ public:
   /*
   * Initialize PID.
   */
-  void Init(double Kp, double Ki, double Kd);
+  void init(double Kp, double Ki, double Kd);
 
   /*
   * Update the PID error variables given cross track error.
+  * Return a new steering angle
   */
-  void UpdateError(double cte);
+  double updateError(double cte);
 
-  /*
-  * Calculate the total PID error.
-  */
-  double TotalError();
 };
 
 #endif /* PID_H */
