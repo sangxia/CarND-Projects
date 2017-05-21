@@ -15,18 +15,21 @@
 using namespace std;
 
 void ParticleFilter::init(double x, double y, double theta, double std[], int num_p) {
+  is_initialized = true;
   num_particles = num_p;
+  gaussian = normal_distribution<double>(0.0, 1.0);
+  uniform_r = uniform_real_distribution<double>(0.0, 1.0);
+  uniform_index = uniform_int_distribution<int>(0, num_particles-1);
   particles.clear();
   for (int i=0; i<num_particles; i++) {
     Particle p;
     p.id = i;
-    p.x = x + std[0]*std_gaussian(gen);
-    p.y = y + std[1]*std_gaussian(gen);
-    p.theta = theta + std[2]*std_gaussian(gen);
+    p.x = x + std[0]*gaussian(gen);
+    p.y = y + std[1]*gaussian(gen);
+    p.theta = theta + std[2]*gaussian(gen);
     p.weight = 1;
     particles.push_back(p);
   }
-  uniform_dist = uniform_int_distribution<int>(0, num_particles-1);
 }
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], 
@@ -40,54 +43,58 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
       new_y = it->y + velocity/yaw_rate*(cos(it->theta)-cos(it->theta+yaw_delta));
       new_theta = it->theta + yaw_delta;
     } else {
-      new_x = it->x + velocity*cos(it->theta);
-      new_y = it->y + velocity*sin(it->theta);
+      new_x = it->x + velocity*cos(it->theta)*delta_t;
+      new_y = it->y + velocity*sin(it->theta)*delta_t;
       new_theta = it->theta;
     }
-    it->x = new_x + std_pos[0]*std_gaussian(gen);
-    it->y = new_y + std_pos[1]*std_gaussian(gen);
-    it->theta = new_theta + std_pos[2]*std_gaussian(gen);
+    // add noise to create some diversity in the particle set
+    it->x = new_x + std_pos[0]*gaussian(gen);
+    it->y = new_y + std_pos[1]*gaussian(gen);
+    it->theta = new_theta + std_pos[2]*gaussian(gen);
   }
 }
 
-void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations) {
-	// TODO: Find the predicted measurement that is closest to each observed measurement and assign the 
-	//   observed measurement to this particular landmark.
-	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
-	//   implement this method and use it as a helper during the updateWeights phase.
-
-}
-
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[], 
-		std::vector<LandmarkObs> observations, Map map_landmarks) {
-	// TODO: Update the weights of each particle using a mult-variate Gaussian distribution. You can read
-	//   more about this distribution here: https://en.wikipedia.org/wiki/Multivariate_normal_distribution
-	// NOTE: The observations are given in the VEHICLE'S coordinate system. 
-  // Your particles are located according to the MAP'S coordinate system. 
-  // You will need to transform between the two systems.
-	// Keep in mind that this transformation requires both rotation AND 
-  // translation (but no scaling).
-  //
-	//   The following is a good resource for the theory:
-	//   https://www.willamette.edu/~gorr/classes/GeneralGraphics/Transforms/transforms2d.htm
-	//   and the following is a good resource for the actual equation to implement (look at equation 
-	//   3.33. Note that you'll need to switch the minus sign in that equation to a plus to account 
-	//   for the fact that the map's y-axis actually points downwards.)
-	//   http://planning.cs.uiuc.edu/node99.html
+		vector<LandmarkObs> observations, Map map_landmarks) {
+  double sq_sensor_range = sensor_range * sensor_range;
+  for (vector<Particle>::iterator itp=particles.begin(); itp!=particles.end(); itp++) {
+    double w = 0.0;
+    for (vector<LandmarkObs>::iterator itobs=observations.begin();
+        itobs!=observations.end(); itobs++) {
+      // calculate observation in map coordinate
+      double costh = cos(itp->theta);
+      double sinth = sin(itp->theta);
+      double est_x = itp->x + itobs->x * costh - itobs->y * sinth;
+      double est_y = itp->y + itobs->x * sinth + itobs->y * costh;
+      // TODO will there be two detections matched to the same landmark?
+      double minsqdist = 1e9;
+      int best_lmi = -1;
+      double best_sq_xdiff = 1e9, best_sq_ydiff = 1e9;
+      for (vector<Map::single_landmark_s>::iterator itlm=map_landmarks.landmark_list.begin();
+          itlm!=map_landmarks.landmark_list.end(); itlm++) {
+        double sq_xdiff = (est_x-itlm->x_f) * (est_x-itlm->x_f);
+        double sq_ydiff = (est_y-itlm->y_f) * (est_y-itlm->y_f);
+        if (sq_xdiff+sq_ydiff < minsqdist) {
+          minsqdist = sq_xdiff+sq_ydiff;
+          best_sq_xdiff = sq_xdiff;
+          best_sq_ydiff = sq_ydiff;
+          best_lmi = itlm->id_i;
+        }
+      }
+      w += (-(best_sq_xdiff/(std_landmark[0]*std_landmark[0]) +
+            best_sq_ydiff/(std_landmark[1]*std_landmark[1])));
+    }
+    itp->weight = w;
+  }
+  updateBestParticle();
 }
 
 void ParticleFilter::resample() {
   vector<Particle> new_particles;
-  double max_weight = 0.0;
-  for (vector<Particle>::iterator it=particles.begin(); it!=particles.end(); it++) {
-    if (it->weight > max_weight) {
-      max_weight = it->weight;
-    }
-  }
-  int index = uniform_dist(gen);
+  int index = uniform_index(gen);
   double beta = 0.0;
   for (int i=0; i<num_particles; i++) {
-    beta += uniform(gen) * 2.0 * max_weight;
+    beta += uniform_r(gen) * 2.0;
     while (beta > particles[index].weight) {
       beta -= particles[index].weight;
       index = (index + 1) % num_particles;
@@ -97,26 +104,26 @@ void ParticleFilter::resample() {
   particles = new_particles;
 }
 
-void ParticleFilter::write(std::string filename) {
+void ParticleFilter::write(string filename) {
 	// You don't need to modify this file.
-	std::ofstream dataFile;
-	dataFile.open(filename, std::ios::app);
+	ofstream dataFile;
+	dataFile.open(filename, ios::app);
 	for (int i = 0; i < num_particles; ++i) {
 		dataFile << particles[i].x << " " << particles[i].y << " " << particles[i].theta << "\n";
 	}
 	dataFile.close();
 }
 
-void ParticleFilter::getBestParticle() {
-  double best_weight = 0.0;
-  Particle best_particle;
-  for (vector<Particle>::iterator it=particles.begin(); 
-      it != particles.end(); it++) {
+void ParticleFilter::updateBestParticle() {
+  double best_weight = -1e9;
+  for (vector<Particle>::iterator it=particles.begin(); it!=particles.end(); it++) {
     if (it->weight > best_weight) {
       best_weight = it->weight;
       best_particle = *it;
     }
   }
-  return best_particle;
+  for (vector<Particle>::iterator it=particles.begin(); it!=particles.end(); it++) {
+    it->weight = exp(it->weight - best_weight);
+  }
 }
 

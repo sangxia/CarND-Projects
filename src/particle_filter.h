@@ -12,6 +12,8 @@
 #include <random>
 #include "helper_functions.h"
 
+using namespace std;
+
 struct Particle {
 	int id;
 	double x;
@@ -28,20 +30,24 @@ class ParticleFilter {
 	bool is_initialized;
 
 	// Vector of weights of all particles
-	// std::vector<double> weights;
+	// vector<double> weights;
 
 	// Set of current particles
-	std::vector<Particle> particles;
+	vector<Particle> particles;
 
   default_random_engine gen;
 
   // standard gaussian, used to add noise
-  normal_distribution<double> std_gaussian(0, 1);
+  normal_distribution<double> gaussian;
 
   // uniform distribution
-  uniform_int_distribution<int> uniform_dist;
+  uniform_int_distribution<int> uniform_index;
 
-  uniform_real_distribution<int> uniform(0.0, 1.0);
+  uniform_real_distribution<double> uniform_r;
+
+  Particle best_particle;
+
+  void updateBestParticle();
 
 public:
 
@@ -61,7 +67,7 @@ public:
    *   standard deviation of y [m], standard deviation of yaw [rad]]
    * @param num_p Number of particles to use
 	 */
-	void init(double x, double y, double theta, double std[], int num_p = 1000);
+	void init(double x, double y, double theta, double std[], int num_p = 10);
 
 	/**
 	 * prediction Predicts the state for the next time step
@@ -75,23 +81,14 @@ public:
 	void prediction(double delta_t, double std_pos[], double velocity, double yaw_rate);
 	
 	/**
-	 * dataAssociation Finds which observations correspond to which landmarks (likely by using
-	 *   a nearest-neighbors data association).
-	 * @param predicted Vector of predicted landmark observations
-	 * @param observations Vector of landmark observations
-	 */
-	void dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations);
-	
-	/**
 	 * updateWeights Updates the weights for each particle based on the likelihood of the 
 	 *   observed measurements. 
 	 * @param sensor_range Range [m] of sensor
-	 * @param std_landmark[] Array of dimension 2 [standard deviation of range [m],
-	 *   standard deviation of bearing [rad]]
+	 * @param std_landmark[] std dev of x and y
 	 * @param observations Vector of landmark observations
 	 * @param map Map class containing map landmarks
 	 */
-	void updateWeights(double sensor_range, double std_landmark[], std::vector<LandmarkObs> observations,
+	void updateWeights(double sensor_range, double std_landmark[], vector<LandmarkObs> observations,
 			Map map_landmarks);
 	
 	/**
@@ -103,13 +100,13 @@ public:
   /**
    * return the best particle
    */
-  Particle getBestParticle();
+  Particle getBestParticle() { return best_particle; }
 	
 	/*
 	 * write Writes particle positions to a file.
 	 * @param filename File to write particle positions to.
 	 */
-	void write(std::string filename);
+	void write(string filename);
 	
 	/**
 	 * initialized Returns whether particle filter is initialized yet or not.

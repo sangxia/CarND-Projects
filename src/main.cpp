@@ -5,6 +5,7 @@
  *      Author: Tiffany Huang
  */
 
+#include <sstream>
 #include <iostream>
 #include <ctime>
 #include <iomanip>
@@ -15,12 +16,22 @@
 
 using namespace std;
 
-int main() {
+int main(int argc, char* argv[]) {
 	// parameters related to grading.
 	int time_steps_before_lock_required = 100; // number of time steps before accuracy is checked by grader.
 	double max_runtime = 45; // Max allowable runtime to pass [sec]
 	double max_translation_error = 1; // Max allowable translation error to pass [m]
 	double max_yaw_error = 0.05; // Max allowable yaw error [rad]
+
+  int num_particles = 50;
+
+  if (argc > 1) {
+    istringstream ss(argv[1]);
+    if (!(ss >> num_particles)) {
+      cerr << "Invalid number of particles " << argv[1] << endl;
+      return -1;
+    }
+  }
 
 	// Start timer.
 	int start = clock();
@@ -70,7 +81,8 @@ int main() {
 	double total_error[3] = {0,0,0};
 	double cum_mean_error[3] = {0,0,0};
 	for (int i = 0; i < num_time_steps; ++i) {
-		cout << "Time step: " << i << endl;
+		cout << "Time step: " << i << " gt " << gt[i].x << " " << gt[i].y 
+      << " " << gt[i].theta << endl;
 		// Read in landmark observations for current time step.
 		ostringstream file;
 		file << "data/observation/observations_" << setfill('0') << setw(6) << i+1 << ".txt";
@@ -84,7 +96,7 @@ int main() {
 			n_x = N_x_init(gen);
 			n_y = N_y_init(gen);
 			n_theta = N_theta_init(gen);
-			pf.init(gt[i].x + n_x, gt[i].y + n_y, gt[i].theta + n_theta, sigma_pos);
+			pf.init(gt[i].x + n_x, gt[i].y + n_y, gt[i].theta + n_theta, sigma_pos, num_particles);
 		} else {
 			// Predict the vehicle's next state (noiseless).
 			pf.prediction(delta_t, sigma_pos, position_meas[i-1].velocity, position_meas[i-1].yawrate);
@@ -104,18 +116,7 @@ int main() {
 		// Update the weights and resample
 		pf.updateWeights(sensor_range, sigma_landmark, noisy_observations, map);
 		pf.resample();
-		
-		// Calculate and output the average weighted error of the particle filter over all time steps so far.
-    // vector<Particle> particles = pf.particles;
-		// int num_particles = particles.size();
-		// double highest_weight = 0.0;
 		Particle best_particle = pf.getBestParticle();
-		// for (int i = 0; i < num_particles; ++i) {
-		// 	if (particles[i].weight > highest_weight) {
-		// 		highest_weight = particles[i].weight;
-		// 		best_particle = particles[i];
-		// 	}
-		// }
 		double *avg_error = getError(gt[i].x, gt[i].y, gt[i].theta, best_particle.x, best_particle.y, best_particle.theta);
 		for (int j = 0; j < 3; ++j) {
 			total_error[j] += avg_error[j];

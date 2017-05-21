@@ -5,4 +5,5 @@
 #
 
 # Run particle filter
-./build/particle_filter
+
+./build/particle_filter $1
