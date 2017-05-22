@@ -24,9 +24,14 @@ public:
   double speed_rate = 15;
   double speed_limit = 60;
   double normal_throttle = 0.5;
+  double brake_throttle = -0.5;
 
   double steer_ctrl;
   double throttle_ctrl;
+
+  int steer_hist_max, steer_hist_size, steer_hist_index;
+  double steer_hist_sum;
+  double *steer_history;
 
   /*
   * Coefficients
@@ -49,7 +54,7 @@ public:
   * Initialize PID.
   */
   void init(double Kp, double Ki, double Kd, double speed_rate,
-      double speed, double throttle);
+      double speed, double throttle, double brake, int steer_hist_max);
 
   /*
   * Update the PID error variables given cross track error.

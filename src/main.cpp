@@ -32,7 +32,7 @@ std::string hasData(std::string s) {
 }
 
 int readParams(char* fname, double &Kp, double &Ki, double &Kd, double &speed_r,
-    double &speed_max, double &const_throttle) {
+    double &speed_max, double &const_throttle, double &brake, int &steer_hist_max) {
   std::ifstream in_file(fname, std::ifstream::in);
   if (!in_file) {
     return -1;
@@ -60,6 +60,12 @@ int readParams(char* fname, double &Kp, double &Ki, double &Kd, double &speed_r,
     } else if (pname == "const_throttle") {
       iss >> const_throttle;
       std::cout << pname << " " << const_throttle << std::endl;
+    } else if (pname == "brake") {
+      iss >> brake;
+      std::cout << pname << " " << brake << std::endl;
+    } else if (pname == "steer_hist") {
+      iss >> steer_hist_max;
+      std::cout << pname << " " << steer_hist_max << std::endl;
     } else {
       return -1;
     }
@@ -78,14 +84,16 @@ int main(int argc, char* argv[])
   double speed_r = 20;
   double speed_max = 60;
   double const_throttle = 1;
+  double brake = -0.5;
+  int steer_hist_max = 1;
   if (argc > 1) {
-    int ret = readParams(argv[1], Kp, Ki, Kd, speed_r, speed_max, const_throttle);
+    int ret = readParams(argv[1], Kp, Ki, Kd, speed_r, speed_max, const_throttle, brake, steer_hist_max);
     if (ret != 0) {
       std::cout << "wrong parameters" << std::endl;
       return -1;
     }
   }
-  pid.init(Kp, Ki, Kd, speed_r, speed_max, const_throttle);
+  pid.init(Kp, Ki, Kd, speed_r, speed_max, const_throttle, brake, steer_hist_max);
 
   h.onMessage(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>*, char*, size_t, uWS::OpCode)>>(
       [&pid](uWS::WebSocket<uWS::SERVER> *ws, char *data, size_t length, uWS::OpCode opCode) {
