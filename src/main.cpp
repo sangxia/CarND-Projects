@@ -31,8 +31,9 @@ std::string hasData(std::string s) {
   return "";
 }
 
-int readParams(char* fname, double &Kp, double &Ki, double &Kd, double &speed_r,
-    double &speed_max, double &const_throttle, double &brake, int &steer_hist_max) {
+int readParams(char* fname, double &Kp, double &Ki, double &Kd, double &tol,
+    double &speed_r, double &speed_max, double &const_throttle, double &brake, double &cruise_throttle,
+    int &steer_hist_max, bool &verb) {
   std::ifstream in_file(fname, std::ifstream::in);
   if (!in_file) {
     return -1;
@@ -42,7 +43,9 @@ int readParams(char* fname, double &Kp, double &Ki, double &Kd, double &speed_r,
   while (getline(in_file, line)) {
     std::istringstream iss(line);
     iss >> pname;
-    if (pname == "Kp") {
+    if (pname == "#") {
+      continue;
+    } else if (pname == "Kp") {
       iss >> Kp;
       std::cout << pname << " " << Kp << std::endl;
     } else if (pname == "Ki") {
@@ -57,12 +60,21 @@ int readParams(char* fname, double &Kp, double &Ki, double &Kd, double &speed_r,
     } else if (pname == "speed_max") {
       iss >> speed_max;
       std::cout << pname << " " << speed_max << std::endl;
+    } else if (pname == "cruise") {
+      iss >> cruise_throttle;
+      std::cout << pname << " " << cruise_throttle << std::endl;
     } else if (pname == "const_throttle") {
       iss >> const_throttle;
       std::cout << pname << " " << const_throttle << std::endl;
     } else if (pname == "brake") {
       iss >> brake;
       std::cout << pname << " " << brake << std::endl;
+    } else if (pname == "cte_tol") {
+      iss >> tol;
+      std::cout << pname << " " << tol << std::endl;
+    } else if (pname == "verbose") {
+      iss >> verb;
+      std::cout << pname << " " << verb << std::endl;
     } else if (pname == "steer_hist") {
       iss >> steer_hist_max;
       std::cout << pname << " " << steer_hist_max << std::endl;
@@ -85,18 +97,25 @@ int main(int argc, char* argv[])
   double speed_max = 60;
   double const_throttle = 1;
   double brake = -0.5;
+  double cruise_throttle = 0.6;
+  double tol = 0.3;
   int steer_hist_max = 1;
+  bool verb = false;
+
   if (argc > 1) {
-    int ret = readParams(argv[1], Kp, Ki, Kd, speed_r, speed_max, const_throttle, brake, steer_hist_max);
+    int ret = readParams(argv[1], Kp, Ki, Kd, tol, 
+        speed_r, speed_max, const_throttle, brake, cruise_throttle, steer_hist_max, verb);
     if (ret != 0) {
       std::cout << "wrong parameters" << std::endl;
       return -1;
     }
   }
-  pid.init(Kp, Ki, Kd, speed_r, speed_max, const_throttle, brake, steer_hist_max);
+  pid.init(Kp, Ki, Kd, tol, speed_r, speed_max, 
+      const_throttle, brake, cruise_throttle, steer_hist_max, verb);
 
+  double topspeed = 0.0;
   h.onMessage(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>*, char*, size_t, uWS::OpCode)>>(
-      [&pid](uWS::WebSocket<uWS::SERVER> *ws, char *data, size_t length, uWS::OpCode opCode) {
+      [&pid, &topspeed](uWS::WebSocket<uWS::SERVER> *ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -116,10 +135,17 @@ int main(int argc, char* argv[])
           pid.updateError(cte, speed);
           steer_value = pid.steer_ctrl;
           throttle = pid.throttle_ctrl;
+
+          if (speed > topspeed) {
+            topspeed = speed;
+            std::cout << "NEW TOP SPEED " << speed << std::endl;
+          }
           
           // DEBUG
-          std::cout << "CTE:\t" << cte << "\tD:\t" << pid.d_error << "\tI:\t" << pid.i_error
-            << "\tSteer:\t" << steer_value << std::endl;
+          if (pid.verbose) {
+            std::cout << "CTE:\t" << cte << "\tD:\t" << pid.d_error << "\tI:\t" << pid.i_error
+              << "\tSteer:\t" << steer_value << std::endl;
+          }
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
