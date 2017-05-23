@@ -7,6 +7,8 @@
 #include "json.hpp"
 #include "PID.h"
 
+#define uWS_013
+
 // for convenience
 using json = nlohmann::json;
 
@@ -114,8 +116,13 @@ int main(int argc, char* argv[])
       const_throttle, brake, cruise_throttle, steer_hist_max, verb);
 
   double topspeed = 0.0;
+#ifdef uWS_013
+  h.onMessage(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>, char*, size_t, uWS::OpCode)>>(
+      [&pid, &topspeed](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+#else
   h.onMessage(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>*, char*, size_t, uWS::OpCode)>>(
       [&pid, &topspeed](uWS::WebSocket<uWS::SERVER> *ws, char *data, size_t length, uWS::OpCode opCode) {
+#endif
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -152,12 +159,20 @@ int main(int argc, char* argv[])
           msgJson["throttle"] = throttle;
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
           // std::cout << msg << std::endl;
+#ifdef uWS_013
+          ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+#else
           ws->send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+#endif
         }
       } else {
         // Manual driving
         std::string msg = "42[\"manual\",{}]";
+#ifdef uWS_013
+        ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+#else
         ws->send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+#endif
       }
     }
   }));
@@ -177,14 +192,28 @@ int main(int argc, char* argv[])
     }
   });
 
+#ifdef uWS_013
+  h.onConnection(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>, uWS::HttpRequest)>>(
+        [&h](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) {
+#else
   h.onConnection(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>*, uWS::HttpRequest)>>(
         [&h](uWS::WebSocket<uWS::SERVER> *ws, uWS::HttpRequest req) {
+#endif
     std::cout << "Connected!!!" << std::endl;
   }));
 
+#ifdef uWS_013
+  h.onDisconnection(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>, int, char*, size_t)>>(
+        [&h](uWS::WebSocket<uWS::SERVER> ws, int code, char *message, size_t length) {
+#else
   h.onDisconnection(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>*, int, char*, size_t)>>(
         [&h](uWS::WebSocket<uWS::SERVER> *ws, int code, char *message, size_t length) {
+#endif
+#ifdef uWS_013
+    ws.close();
+#else
     ws->close();
+#endif
     std::cout << "Disconnected" << std::endl;
   }));
 
