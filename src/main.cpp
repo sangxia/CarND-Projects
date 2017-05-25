@@ -1,5 +1,7 @@
 #include <math.h>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <thread>
 #include <vector>
 #include <chrono>
@@ -34,7 +36,75 @@ string hasData(string s) {
   return "";
 }
 
-int main() {
+int readParams(char* fname, double &ref_v, double &ref_cte, double &ref_epsi,
+    double &actuator_delay, double &w_v, double &w_cte, double &w_epsi,
+    double &w_delta, double &w_a, double &w_ddelta, double &w_da,
+    double &time_discount, size_t &N, double &dt, int &degree) {
+
+  std::ifstream in_file(fname, std::ifstream::in);
+  if (!in_file) {
+    return -1;
+  }
+  std::string line;
+  std::string pname;
+  while (getline(in_file, line)) {
+    std::istringstream iss(line);
+    iss >> pname;
+    if (pname == "#") {
+      continue;
+    } else if (pname == "ref_v") {
+      iss >> ref_v;
+      std::cout << pname << " " << ref_v << std::endl;
+    } else if (pname == "ref_cte") {
+      iss >> ref_cte;
+      std::cout << pname << " " << ref_cte << std::endl;
+    } else if (pname == "ref_epsi") {
+      iss >> ref_epsi;
+      std::cout << pname << " " << ref_epsi << std::endl;
+    } else if (pname == "actuator_delay") {
+      iss >> actuator_delay;
+      std::cout << pname << " " << actuator_delay << std::endl;
+    } else if (pname == "w_v") {
+      iss >> w_v;
+      std::cout << pname << " " << w_v << std::endl;
+    } else if (pname == "w_cte") {
+      iss >> w_cte;
+      std::cout << pname << " " << w_cte << std::endl;
+    } else if (pname == "w_epsi") {
+      iss >> w_epsi;
+      std::cout << pname << " " << w_epsi << std::endl;
+    } else if (pname == "w_delta") {
+      iss >> w_delta;
+      std::cout << pname << " " << w_delta << std::endl;
+    } else if (pname == "w_a") {
+      iss >> w_a;
+      std::cout << pname << " " << w_a << std::endl;
+    } else if (pname == "w_ddelta") {
+      iss >> w_ddelta;
+      std::cout << pname << " " << w_ddelta << std::endl;
+    } else if (pname == "w_da") {
+      iss >> w_da;
+      std::cout << pname << " " << w_da << std::endl;
+    } else if (pname == "time_discount") {
+      iss >> time_discount;
+      std::cout << pname << " " << time_discount << std::endl;
+    } else if (pname == "N") {
+      iss >> N;
+      std::cout << pname << " " << N << std::endl;
+    } else if (pname == "dt") {
+      iss >> dt;
+      std::cout << pname << " " << dt << std::endl;
+    } else if (pname == "degree") {
+      iss >> degree;
+      std::cout << pname << " " << degree << std::endl;
+    } else {
+      return -1;
+    }
+  }
+  return 0;
+}
+
+int main(int argc, char* argv[]) {
   uWS::Hub h;
 
   double ref_v = 15.0;
@@ -51,19 +121,23 @@ int main() {
   double time_discount = 0.9;
   size_t N = 20;
   double dt = 0.05;
+  int degree = 2;
 
-  double prev_a = 0.0;
-  double prev_delta = 0.0;
+  if (argc > 1) {
+    int ret = readParams(argv[1], ref_v, ref_cte, ref_epsi, actuator_delay, w_v, w_cte,
+        w_epsi, w_delta, w_a, w_ddelta, w_da, time_discount, N, dt, degree);
+    if (ret != 0) {
+      std::cout << "wrong parameters" << std::endl;
+      return -1;
+    }
+  }
 
-  // MPC is initialized here!
   MPC mpc;
   mpc.init(ref_v, ref_cte, ref_epsi, actuator_delay, w_v, w_cte, w_epsi, w_delta, w_a, w_ddelta, w_da,
       time_discount, N, dt);
 
-  int degree = 2;
-
   h.onMessage(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>*, char*, size_t, uWS::OpCode)>>(
-      [&mpc, &degree, &prev_delta, &prev_a](uWS::WebSocket<uWS::SERVER> *ws, char *data, size_t length,
+      [&mpc, &degree](uWS::WebSocket<uWS::SERVER> *ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -100,8 +174,6 @@ int main() {
           vector<double> sol = mpc.Solve(state, coeffs, -current_steer * (25.0/180.0*M_PI), 
               current_throttle);
 
-          prev_delta = sol[0];
-          prev_a = sol[1];
           json msgJson;
           
           msgJson["steering_angle"] = -sol[0] / (25.0/180.0*M_PI);

@@ -46,7 +46,7 @@ class FG_eval {
       fg[0] = 0;
       // MSE compared to the reference state.
       double time_weight = 1.0;
-      for (int i = param.delay_cycle+1; i < param.N; i++) {
+      for (int i = 0; i < param.N; i++) {
         fg[0] += time_weight * param.w_cte * 
           CppAD::pow(vars[param.cte_start + i] - param.ref_cte, 2);
         fg[0] += time_weight * param.w_epsi * 
@@ -183,7 +183,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs,
   // The upper and lower limits of delta are set to -25 and 25
   // degrees (values in radians).
   for (int i = param.delta_start; i < param.a_start; i++) {
-    if (i-param.delta_start <= param.delay_cycle) {
+    if (i-param.delta_start < param.delay_cycle) {
       vars_lowerbound[i] = prev_delta;
       vars_upperbound[i] = prev_delta;
     } else {
@@ -193,7 +193,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs,
   }
   // Acceleration/decceleration upper and lower limits.
   for (int i = param.a_start; i < n_vars; i++) {
-    if (i-param.a_start <= param.delay_cycle) {
+    if (i-param.a_start < param.delay_cycle) {
       vars_lowerbound[i] = prev_a;
       vars_upperbound[i] = prev_a;
     } else {
@@ -244,11 +244,6 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs,
 
   auto cost = solution.obj_value;
   std::cout << ok << " Cost " << cost << std::endl;
-  std::cout << prev_delta << " " << prev_a << std::endl;
-  std::cout << solution.x[param.delta_start] << " " << solution.x[param.a_start] << std::endl;
-  std::cout << solution.x[param.delta_start+1] << " " << solution.x[param.a_start+1] << std::endl;
-  std::cout << solution.x[param.delta_start+2] << " " << solution.x[param.a_start+2] << std::endl;
-  std::cout << solution.x[param.delta_start+3] << " " << solution.x[param.a_start+3] << std::endl;
-  return {solution.x[param.delta_start+param.delay_cycle+1], 
-    solution.x[param.a_start+param.delay_cycle+1]};
+  return {solution.x[param.delta_start+param.delay_cycle], 
+    solution.x[param.a_start+param.delay_cycle]};
 }
