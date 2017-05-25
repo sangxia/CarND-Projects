@@ -194,6 +194,9 @@ int main(int argc, char* argv[]) {
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
 
+          next_x_vals = {-20, -10, -5, 0, 5, 10, 20};
+          next_y_vals = {0, 0, 0, 0, 0, 0, 0};
+
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
 
