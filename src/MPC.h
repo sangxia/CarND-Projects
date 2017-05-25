@@ -13,6 +13,7 @@ struct Parameters {
     double ref_epsi;
 
     double actuator_delay;
+    size_t delay_cycle;
 
     // importance of the various components for cost
     double w_v;
@@ -66,7 +67,8 @@ class MPC {
 
     // Solve the model given an initial state and polynomial coefficients.
     // Return the first actuatotions.
-    vector<double> Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs);
+    vector<double> Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs,
+        double prev_delta, double prev_a);
 };
 
 #endif /* MPC_H */

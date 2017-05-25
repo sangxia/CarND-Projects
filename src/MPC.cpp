@@ -12,13 +12,18 @@ class FG_eval {
     // Coefficients of the fitted polynomial.
     Eigen::VectorXd coeffs;
     double Lf;
+    double prev_a;
+    double prev_delta;
 
     Parameters param;
 
-    FG_eval(Eigen::VectorXd coeffs, Parameters p, double Lf) { 
+    FG_eval(Eigen::VectorXd coeffs, Parameters p, double Lf, double prev_delta, 
+        double prev_a) { 
       this->param = p;
       this->coeffs = coeffs;
       this->Lf = Lf;
+      this->prev_delta = prev_delta;
+      this->prev_a = prev_a;
     }
   
     typedef CPPAD_TESTVECTOR(AD<double>) ADvector;
@@ -41,7 +46,7 @@ class FG_eval {
       fg[0] = 0;
       // MSE compared to the reference state.
       double time_weight = 1.0;
-      for (int i = 0; i < param.N; i++) {
+      for (int i = param.delay_cycle+1; i < param.N; i++) {
         fg[0] += time_weight * param.w_cte * 
           CppAD::pow(vars[param.cte_start + i] - param.ref_cte, 2);
         fg[0] += time_weight * param.w_epsi * 
@@ -51,12 +56,12 @@ class FG_eval {
         time_weight *= param.time_discount;
       }
       // Minimize the use of actuators.
-      for (int i = 0; i < param.N - 1; i++) {
+      for (int i = param.delay_cycle; i < param.N - 1; i++) {
         fg[0] += param.w_delta * CppAD::pow(vars[param.delta_start + i], 2);
         fg[0] += param.w_a * CppAD::pow(vars[param.a_start + i], 2);
       }
       // Minimize the value gap between sequential actuations.
-      for (int i = 0; i < param.N - 2; i++) {
+      for (int i = param.delay_cycle-1; i < param.N - 2; i++) {
         fg[0] += param.w_ddelta * 
           CppAD::pow(vars[param.delta_start + i + 1] - vars[param.delta_start + i], 2);
         fg[0] += param.w_da * 
@@ -85,19 +90,19 @@ class FG_eval {
         AD<double> v1 = vars[param.v_start + i + 1];
         AD<double> cte1 = vars[param.cte_start + i + 1];
         AD<double> epsi1 = vars[param.epsi_start + i + 1];
-        // the actuation at time t.
-        AD<double> delta0 = vars[param.delta_start + i];
-        AD<double> a0 = vars[param.a_start + i];
+        // reference position and orientation
         AD<double> f1 = evalpoly(x1);
         AD<double> psides0 = CppAD::atan(coeffs[1]);
-
+        // the actuation at time t.
         fg[2 + param.x_start + i] = x1 - (x0 + v0 * CppAD::cos(psi0) * param.dt);
         fg[2 + param.y_start + i] = y1 - (y0 + v0 * CppAD::sin(psi0) * param.dt);
-        fg[2 + param.psi_start + i] = psi1 - (psi0 + v0 * delta0 / Lf * param.dt);
-        fg[2 + param.v_start + i] = v1 - (v0 + a0 * param.dt);
         fg[2 + param.cte_start + i] = cte1 - (f1 - y1);
         // TODO below is an approximation, psides0 ought to be some version of psides1
         fg[2 + param.epsi_start + i] = epsi1 - (psides0 - psi1);
+        AD<double> delta0 = vars[param.delta_start + i];
+        AD<double> a0 = vars[param.a_start + i];
+        fg[2 + param.psi_start + i] = psi1 - (psi0 + v0 * delta0 / Lf * param.dt);
+        fg[2 + param.v_start + i] = v1 - (v0 + a0 * param.dt);
       }
     }
 };
@@ -123,6 +128,7 @@ void MPC::init(double ref_v, double ref_cte, double ref_epsi, double actuator_de
   param.time_discount = time_discount;
   param.N = N;
   param.dt = dt;
+  param.delay_cycle = (size_t)(ceil(actuator_delay/dt));
   param.x_start = 0;
   param.y_start = param.x_start + param.N;
   param.psi_start = param.y_start + param.N;
@@ -133,7 +139,8 @@ void MPC::init(double ref_v, double ref_cte, double ref_epsi, double actuator_de
   param.a_start = param.delta_start + param.N - 1;
 }
 
-vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
+vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs,
+    double prev_delta, double prev_a) {
   bool ok = true;
   size_t i;
   typedef CPPAD_TESTVECTOR(double) Dvector;
@@ -176,13 +183,23 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // The upper and lower limits of delta are set to -25 and 25
   // degrees (values in radians).
   for (int i = param.delta_start; i < param.a_start; i++) {
-    vars_lowerbound[i] = -25.0/180.0*M_PI;
-    vars_upperbound[i] = 25.0/180.0*M_PI;
+    if (i-param.delta_start <= param.delay_cycle) {
+      vars_lowerbound[i] = prev_delta;
+      vars_upperbound[i] = prev_delta;
+    } else {
+      vars_lowerbound[i] = -25.0/180.0*M_PI;
+      vars_upperbound[i] = 25.0/180.0*M_PI;
+    }
   }
   // Acceleration/decceleration upper and lower limits.
   for (int i = param.a_start; i < n_vars; i++) {
-    vars_lowerbound[i] = -1.0;
-    vars_upperbound[i] = 1.0;
+    if (i-param.a_start <= param.delay_cycle) {
+      vars_lowerbound[i] = prev_a;
+      vars_upperbound[i] = prev_a;
+    } else {
+      vars_lowerbound[i] = -1.0;
+      vars_upperbound[i] = 1.0;
+    }
   }
 
   // Lower and upper limits for constraints
@@ -209,14 +226,14 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   constraints_upperbound[param.epsi_start] = epsi;
 
   // Object that computes objective and constraints
-  FG_eval fg_eval(coeffs, param, Lf);
+  FG_eval fg_eval(coeffs, param, Lf, prev_delta, prev_a);
 
   // options
   std::string options;
   options += "Integer print_level  0\n";
   options += "Sparse  true        forward\n";
   options += "Sparse  true        reverse\n";
-  options += "Numeric max_cpu_time          0.5\n";
+  options += "Numeric max_cpu_time          0.05\n";
 
   CppAD::ipopt::solve_result<Dvector> solution;
   CppAD::ipopt::solve<Dvector, FG_eval>(
@@ -227,5 +244,11 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
   auto cost = solution.obj_value;
   std::cout << ok << " Cost " << cost << std::endl;
-  return {solution.x[param.delta_start], solution.x[param.a_start]};
+  std::cout << prev_delta << " " << prev_a << std::endl;
+  std::cout << solution.x[param.delta_start] << " " << solution.x[param.a_start] << std::endl;
+  std::cout << solution.x[param.delta_start+1] << " " << solution.x[param.a_start+1] << std::endl;
+  std::cout << solution.x[param.delta_start+2] << " " << solution.x[param.a_start+2] << std::endl;
+  std::cout << solution.x[param.delta_start+3] << " " << solution.x[param.a_start+3] << std::endl;
+  return {solution.x[param.delta_start+param.delay_cycle+1], 
+    solution.x[param.a_start+param.delay_cycle+1]};
 }

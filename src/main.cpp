@@ -37,12 +37,12 @@ string hasData(string s) {
 int main() {
   uWS::Hub h;
 
-  double ref_v = 30.0;
+  double ref_v = 15.0;
   double ref_cte = 0.0;
   double ref_epsi = 0.0;
   double actuator_delay = 0.1;
   double w_v = 1.0;
-  double w_cte = 0.2;
+  double w_cte = 0.3;
   double w_epsi = 1.0;
   double w_delta = 1.0;
   double w_a = 1.0;
@@ -52,15 +52,18 @@ int main() {
   size_t N = 20;
   double dt = 0.05;
 
+  double prev_a = 0.0;
+  double prev_delta = 0.0;
+
   // MPC is initialized here!
   MPC mpc;
   mpc.init(ref_v, ref_cte, ref_epsi, actuator_delay, w_v, w_cte, w_epsi, w_delta, w_a, w_ddelta, w_da,
       time_discount, N, dt);
 
-  int degree = 3;
+  int degree = 2;
 
   h.onMessage(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>*, char*, size_t, uWS::OpCode)>>(
-      [&mpc, &degree](uWS::WebSocket<uWS::SERVER> *ws, char *data, size_t length,
+      [&mpc, &degree, &prev_delta, &prev_a](uWS::WebSocket<uWS::SERVER> *ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -89,29 +92,20 @@ int main() {
               Eigen::VectorXd::Map(veh_ref_x.data(), veh_ref_x.size()), 
               Eigen::VectorXd::Map(veh_ref_y.data(), veh_ref_y.size()), 
               degree);
-          std::cout << coeffs << std::endl;
           // Eigen::VectorXd coeffs_d = get_poly_derivative(coeffs);
           Eigen::VectorXd state(6);
           state << 0., 0., 0., v, polyeval(coeffs, 0.), atan(coeffs(1));
-          std::cout << state << std::endl;
-          vector<double> sol = mpc.Solve(state, coeffs);
-          std::cout << sol[0] << " " << sol[1] << std::endl;
+          double current_steer = j[1]["steering_angle"];
+          double current_throttle = j[1]["throttle"];
+          vector<double> sol = mpc.Solve(state, coeffs, -current_steer * (25.0/180.0*M_PI), 
+              current_throttle);
 
-          /*
-          * TODO: Calculate steeering angle and throttle using MPC.
-          *
-          * Both are in between [-1, 1].
-          *
-          */
-          double steer_value;
-          double throttle_value;
-
+          prev_delta = sol[0];
+          prev_a = sol[1];
           json msgJson;
-          // TODO I don't understand why this needs to be negated
-          msgJson["steering_angle"] = -sol[0];
+          
+          msgJson["steering_angle"] = -sol[0] / (25.0/180.0*M_PI);
           msgJson["throttle"] = sol[1];
-//          msgJson["steering_angle"] = steer_value;
-//          msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory 
           vector<double> mpc_x_vals;
@@ -125,16 +119,8 @@ int main() {
           vector<double> next_x_vals;
           vector<double> next_y_vals;
 
-          next_x_vals = {-20, -10, -5, 0, 5, 10, 20};
-          next_y_vals = {0, 0, 0, 0, 0, 0, 0};
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
-//           for (int i=0; i<ptsx.size(); i++) {
-//             double tempx, tempy;
-//             global_to_vehicle(ptsx[i], ptsy[i], px, py, psi, tempx, tempy);
-//             next_x_vals.push_back(tempx);
-//             next_y_vals.push_back(tempy);
-//           }
 
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
