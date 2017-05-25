@@ -1,11 +1,13 @@
 #include <math.h>
-#include <uWS/uWS.h>
-#include <chrono>
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <chrono>
+#include <uWS/uWS.h>
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
+#include "polyutils.h"
+#include "geoutils.h"
 #include "MPC.h"
 #include "json.hpp"
 
@@ -32,46 +34,33 @@ string hasData(string s) {
   return "";
 }
 
-// Evaluate a polynomial.
-double polyeval(Eigen::VectorXd coeffs, double x) {
-  double result = 0.0;
-  for (int i = 0; i < coeffs.size(); i++) {
-    result += coeffs[i] * pow(x, i);
-  }
-  return result;
-}
-
-// Fit a polynomial.
-// Adapted from
-// https://github.com/JuliaMath/Polynomials.jl/blob/master/src/Polynomials.jl#L676-L716
-Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
-                        int order) {
-  assert(xvals.size() == yvals.size());
-  assert(order >= 1 && order <= xvals.size() - 1);
-  Eigen::MatrixXd A(xvals.size(), order + 1);
-
-  for (int i = 0; i < xvals.size(); i++) {
-    A(i, 0) = 1.0;
-  }
-
-  for (int j = 0; j < xvals.size(); j++) {
-    for (int i = 0; i < order; i++) {
-      A(j, i + 1) = A(j, i) * xvals(j);
-    }
-  }
-
-  auto Q = A.householderQr();
-  auto result = Q.solve(yvals);
-  return result;
-}
-
 int main() {
   uWS::Hub h;
 
+  double ref_v = 30.0;
+  double ref_cte = 0.0;
+  double ref_epsi = 0.0;
+  double actuator_delay = 0.1;
+  double w_v = 1.0;
+  double w_cte = 0.2;
+  double w_epsi = 1.0;
+  double w_delta = 1.0;
+  double w_a = 1.0;
+  double w_ddelta = 1.0;
+  double w_da = 1.0;
+  double time_discount = 0.9;
+  size_t N = 20;
+  double dt = 0.05;
+
   // MPC is initialized here!
   MPC mpc;
+  mpc.init(ref_v, ref_cte, ref_epsi, actuator_delay, w_v, w_cte, w_epsi, w_delta, w_a, w_ddelta, w_da,
+      time_discount, N, dt);
 
-  h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  int degree = 3;
+
+  h.onMessage(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>*, char*, size_t, uWS::OpCode)>>(
+      [&mpc, &degree](uWS::WebSocket<uWS::SERVER> *ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -92,6 +81,22 @@ int main() {
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
 
+          // convert reference waypoints to vehicle viewpoint
+          vector<double> veh_ref_x;
+          vector<double> veh_ref_y;
+          global_to_vehicle(ptsx, ptsy, px, py, psi, veh_ref_x, veh_ref_y);
+          Eigen::VectorXd coeffs = polyfit(
+              Eigen::VectorXd::Map(veh_ref_x.data(), veh_ref_x.size()), 
+              Eigen::VectorXd::Map(veh_ref_y.data(), veh_ref_y.size()), 
+              degree);
+          std::cout << coeffs << std::endl;
+          // Eigen::VectorXd coeffs_d = get_poly_derivative(coeffs);
+          Eigen::VectorXd state(6);
+          state << 0., 0., 0., v, polyeval(coeffs, 0.), atan(coeffs(1));
+          std::cout << state << std::endl;
+          vector<double> sol = mpc.Solve(state, coeffs);
+          std::cout << sol[0] << " " << sol[1] << std::endl;
+
           /*
           * TODO: Calculate steeering angle and throttle using MPC.
           *
@@ -102,25 +107,34 @@ int main() {
           double throttle_value;
 
           json msgJson;
-          msgJson["steering_angle"] = steer_value;
-          msgJson["throttle"] = throttle_value;
+          // TODO I don't understand why this needs to be negated
+          msgJson["steering_angle"] = -sol[0];
+          msgJson["throttle"] = sol[1];
+//          msgJson["steering_angle"] = steer_value;
+//          msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory 
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
-
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
 
           msgJson["mpc_x"] = mpc_x_vals;
           msgJson["mpc_y"] = mpc_y_vals;
 
-          //Display the waypoints/reference line
           vector<double> next_x_vals;
           vector<double> next_y_vals;
 
+          next_x_vals = {-20, -10, -5, 0, 5, 10, 20};
+          next_y_vals = {0, 0, 0, 0, 0, 0, 0};
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
+//           for (int i=0; i<ptsx.size(); i++) {
+//             double tempx, tempy;
+//             global_to_vehicle(ptsx[i], ptsy[i], px, py, psi, tempx, tempy);
+//             next_x_vals.push_back(tempx);
+//             next_y_vals.push_back(tempy);
+//           }
 
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
@@ -138,15 +152,15 @@ int main() {
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
           this_thread::sleep_for(chrono::milliseconds(100));
-          ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+          ws->send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
         // Manual driving
         std::string msg = "42[\"manual\",{}]";
-        ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+        ws->send(msg.data(), msg.length(), uWS::OpCode::TEXT);
       }
     }
-  });
+  }));
 
   // We don't need this since we're not using HTTP but if it's removed the
   // program
@@ -162,15 +176,17 @@ int main() {
     }
   });
 
-  h.onConnection([&h](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) {
+  h.onConnection(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>*, uWS::HttpRequest)>>(
+        [&h](uWS::WebSocket<uWS::SERVER> *ws, uWS::HttpRequest req) {
     std::cout << "Connected!!!" << std::endl;
-  });
+  }));
 
-  h.onDisconnection([&h](uWS::WebSocket<uWS::SERVER> ws, int code,
+  h.onDisconnection(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>*, int, char*, size_t)>>(
+      [&h](uWS::WebSocket<uWS::SERVER> *ws, int code,
                          char *message, size_t length) {
-    ws.close();
+    ws->close();
     std::cout << "Disconnected" << std::endl;
-  });
+  }));
 
   int port = 4567;
   if (h.listen(port)) {
