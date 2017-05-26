@@ -70,7 +70,7 @@ The MPC with the given `params.conf` drives around the car safely at full thrott
 around the whole track. It works equally well with lower speed limit (smaller `ref_v`
 values). 
 
-Here is a video of the drive.
+Here is a link to a recording of the drive.
 
 [![Flat out around the lake track](https://img.youtube.com/vi/LHvNzXCDMc0/0.jpg)](https://www.youtube.com/watch?v=LHvNzXCDMc0)
 
