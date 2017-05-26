@@ -113,7 +113,8 @@ class FG_eval {
 
 void MPC::init(double ref_v, double ref_cte, double ref_epsi, double actuator_delay,
     double w_v, double w_cte, double w_epsi, double w_delta, double w_a,
-    double w_ddelta, double w_da, double time_discount, size_t N, double dt){
+    double w_ddelta, double w_da, double time_discount, size_t N, double dt, bool verbose){
+  param.verbose = verbose;
   param.ref_v = ref_v;
   param.ref_cte = ref_cte;
   param.ref_epsi = ref_epsi;
@@ -243,7 +244,9 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs,
   ok &= (solution.status == CppAD::ipopt::solve_result<Dvector>::success);
 
   auto cost = solution.obj_value;
-  std::cout << ok << " Cost " << cost << std::endl;
+  if (param.verbose) {
+    std::cout << ok << " Cost " << cost << std::endl;
+  }
   return {solution.x[param.delta_start+param.delay_cycle], 
     solution.x[param.a_start+param.delay_cycle]};
 }
