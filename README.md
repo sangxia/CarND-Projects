@@ -61,8 +61,9 @@ low delay setting results in more oscillation, which makes sense because when
 the command is actually carried out, it is probably already too little too late
 and in later steps larger corrections will be needed. Experiments also show that 
 it is actually beneficial to slightly over-estimate the delay. Setting it to
-`0.1` is fine but `0.15` gives a smoother drive. Things become erratic when setting
-it to larger values.
+`0.1` is fine but `0.15` gives a smoother drive. It could be that `0.15` is actually
+a better estimate of latency when we take the running time of the optimizer into
+account. Things become erratic when setting it to larger values.
 
 ## Results
 
