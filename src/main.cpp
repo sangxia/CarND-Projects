@@ -39,7 +39,8 @@ string hasData(string s) {
 int readParams(char* fname, double &ref_v, double &ref_cte, double &ref_epsi,
     double &actuator_delay, double &w_v, double &w_cte, double &w_epsi,
     double &w_delta, double &w_a, double &w_ddelta, double &w_da,
-    double &time_discount, size_t &N, double &dt, int &degree, bool &verbose) {
+    double &time_discount, size_t &N, double &dt, int &degree, bool &verbose,
+    bool &draw_ref, bool &draw_mpc) {
 
   std::ifstream in_file(fname, std::ifstream::in);
   if (!in_file) {
@@ -100,6 +101,12 @@ int readParams(char* fname, double &ref_v, double &ref_cte, double &ref_epsi,
     } else if (pname == "verbose") {
       iss >> verbose;
       std::cout << pname << " " << verbose << std::endl;
+    } else if (pname == "draw_ref") {
+      iss >> draw_ref;
+      std::cout << pname << " " << draw_ref << std::endl;
+    } else if (pname == "draw_mpc") {
+      iss >> draw_mpc;
+      std::cout << pname << " " << draw_mpc << std::endl;
     } else {
       return -1;
     }
@@ -126,10 +133,13 @@ int main(int argc, char* argv[]) {
   double dt = 0.05;
   int degree = 2;
   bool verbose = true;
+  bool draw_ref = false;
+  bool draw_mpc = false;
 
   if (argc > 1) {
     int ret = readParams(argv[1], ref_v, ref_cte, ref_epsi, actuator_delay, w_v, w_cte,
-        w_epsi, w_delta, w_a, w_ddelta, w_da, time_discount, N, dt, degree, verbose);
+        w_epsi, w_delta, w_a, w_ddelta, w_da, time_discount, N, dt, degree, verbose,
+        draw_ref, draw_mpc);
     if (ret != 0) {
       std::cout << "wrong parameters" << std::endl;
       return -1;
@@ -141,7 +151,7 @@ int main(int argc, char* argv[]) {
       time_discount, N, dt, verbose);
 
   h.onMessage(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>*, char*, size_t, uWS::OpCode)>>(
-      [&mpc, &degree](uWS::WebSocket<uWS::SERVER> *ws, char *data, size_t length,
+      [&mpc, &degree, &draw_ref, &draw_mpc](uWS::WebSocket<uWS::SERVER> *ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -188,6 +198,10 @@ int main(int argc, char* argv[]) {
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
 
+          if (draw_mpc) {
+            mpc_x_vals = {sol[2], sol[3], sol[4], sol[5], sol[6]};
+            mpc_y_vals = {sol[7], sol[8], sol[9], sol[10], sol[11]};
+          }
           msgJson["mpc_x"] = mpc_x_vals;
           msgJson["mpc_y"] = mpc_y_vals;
 
@@ -196,10 +210,13 @@ int main(int argc, char* argv[]) {
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
+          if (draw_ref) {
+            next_x_vals = veh_ref_x;
+            next_y_vals = veh_ref_y;
+          }
 
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
-
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
           if (mpc.param.verbose) {

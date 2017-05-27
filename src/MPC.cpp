@@ -248,5 +248,16 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs,
     std::cout << ok << " Cost " << cost << std::endl;
   }
   return {solution.x[param.delta_start+param.delay_cycle], 
-    solution.x[param.a_start+param.delay_cycle]};
+    solution.x[param.a_start+param.delay_cycle],
+    solution.x[param.x_start+2],
+    solution.x[param.x_start+4],
+    solution.x[param.x_start+6],
+    solution.x[param.x_start+8],
+    solution.x[param.x_start+10],
+    solution.x[param.y_start+2],
+    solution.x[param.y_start+4],
+    solution.x[param.y_start+6],
+    solution.x[param.y_start+8],
+    solution.x[param.y_start+10],
+  };
 }
