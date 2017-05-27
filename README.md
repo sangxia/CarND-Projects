@@ -75,9 +75,9 @@ values).
 
 Here are links to recordings of a few laps around the track at 93 mph and 100 mph.
 
-[![Around the track at 93 mph](https://www.youtube.com/vi/LxoDVnZMUD8/0.jpg)](https://www.youtube.com/edit?o=U&video_id=LxoDVnZMUD8)
+[![Around the track at 93 mph](https://img.youtube.com/vi/LxoDVnZMUD8/0.jpg)](https://www.youtube.com/edit?o=U&video_id=LxoDVnZMUD8)
 
-[![Around the track at 100 mph](https://www.youtube.com/vi/FhauW99RFVA/0.jpg)](https://www.youtube.com/edit?o=U&video_id=FhauW99RFVA)
+[![Around the track at 100 mph](https://img.youtube.com/vi/FhauW99RFVA/0.jpg)](https://www.youtube.com/edit?o=U&video_id=FhauW99RFVA)
 
 ## Dependencies
 
