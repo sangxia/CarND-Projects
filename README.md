@@ -12,6 +12,8 @@ should allow the model to drive around the lake track at full speed.
 However, this can be sensitive to the computational power of the machine
 and excessive delay can cause problems. If the car does not drive around
 the track smoothly, please change the `ref_v` parameter to a smaller value.
+Setting `ref_v` to `107.5` should result in the vehicle maintaining
+`100 mph` most of the time. 
 
 ## The Model
 
@@ -53,7 +55,7 @@ it makes sense to discount those errors using the parameter `time_discount`.
 
 To account for the delay between the command being issued and it being actuated,
 I simply set the first few actuator command to the current command given by
-telemetry. If the delay is 0.1 seconds and `dt` is 0.05 seconds, then the first
+telemetry. If the delay is `0.1` seconds and `dt` is `0.05` seconds, then the first
 `0.1/0.05=2` commands are set and the values of the third command in the
 actual solution is taken as the command for the current step.
 The delay is also a tunable parameter (`actuator_delay`). Experiment shows that
@@ -61,9 +63,9 @@ low delay setting results in more oscillation, which makes sense because when
 the command is actually carried out, it is probably already too little too late
 and in later steps larger corrections will be needed. Experiments also show that 
 it is actually beneficial to slightly over-estimate the delay. Setting it to
-`0.1` is fine but `0.15` gives a smoother drive. It could be that `0.15` is actually
+`0.1` is fine but `0.18` gives a smoother drive. It could be that `0.18` is actually
 a better estimate of latency when we take the running time of the optimizer into
-account. Things become erratic when setting it to larger values.
+account. Things become erratic when setting it to larger values such as `0.25`.
 
 ## Results
 
@@ -71,9 +73,11 @@ The MPC with the given `params.conf` drives around the car safely at full thrott
 around the whole track. It works equally well with lower speed limit (smaller `ref_v`
 values). 
 
-Here is a link to a recording of the drive.
+Here are links to recordings of a few laps around the track at 93 mph and 100 mph.
 
-[![Flat out around the lake track](https://img.youtube.com/vi/LHvNzXCDMc0/0.jpg)](https://www.youtube.com/watch?v=LHvNzXCDMc0)
+[![Around the track at 93 mph](https://www.youtube.com/vi/LxoDVnZMUD8/0.jpg)](https://www.youtube.com/edit?o=U&video_id=LxoDVnZMUD8)
+
+[![Around the track at 100 mph](https://www.youtube.com/vi/FhauW99RFVA/0.jpg)](https://www.youtube.com/edit?o=U&video_id=FhauW99RFVA)
 
 ## Dependencies
 
