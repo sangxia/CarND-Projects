@@ -38,6 +38,10 @@ class FG_eval {
       return ret;
     }
 
+    AD<double> ADmax(AD<double> x) {
+      return (fabs(x) + x) * 0.5;
+    }
+
     // `fg` is a vector containing the cost and constraints.
     // `vars` is a vector containing the variable values (state & actuators).
     void operator()(ADvector& fg, const ADvector& vars) {
@@ -48,7 +52,7 @@ class FG_eval {
       double time_weight = 1.0;
       for (int i = 0; i < param.N; i++) {
         fg[0] += time_weight * param.w_cte * 
-          CppAD::pow(vars[param.cte_start + i] - param.ref_cte, 2);
+          CppAD::pow(ADmax(fabs(vars[param.cte_start + i]) - param.ref_cte), 2);
         fg[0] += time_weight * param.w_epsi * 
           CppAD::pow(vars[param.epsi_start + i] - param.ref_epsi, 2);
         fg[0] += time_weight * param.w_v * 

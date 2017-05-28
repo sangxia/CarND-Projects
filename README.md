@@ -53,6 +53,14 @@ Under high speed, estimate of the vehicle trajectory further into the future can
 be very inaccurate, resulting in very large error. To get a more stable drive, 
 it makes sense to discount those errors using the parameter `time_discount`.
 
+I also implemented a clipping function (`FG_eval::ADmax`) such that the
+effective CTE used for calculating cost is `max(0, real_cte-ref_cte)`. That is,
+if the CTE is smaller than `ref_cte`, then don't worry about it.
+The CppAD library does not have native support for `max`, so I implemented it
+using `fabs`.  Without this CTE adjustment, the car may have half a wheel on 
+the curb at the tight curve before the main *not-so-*straight. This is greatly
+mitigated with the CTE adjustment.
+
 To account for the delay between the command being issued and it being actuated,
 I simply set the first few actuator command to the current command given by
 telemetry. If the delay is `0.1` seconds and `dt` is `0.05` seconds, then the first
@@ -78,6 +86,9 @@ Here are links to recordings of a few laps around the track at 93 mph and 100 mp
 [![Around the track at 93 mph](https://img.youtube.com/vi/LxoDVnZMUD8/0.jpg)](https://www.youtube.com/watch?v=LxoDVnZMUD8)
 
 [![Around the track at 100 mph](https://img.youtube.com/vi/FhauW99RFVA/0.jpg)](https://www.youtube.com/watch?v=FhauW99RFVA)
+
+The videos above were recorded with zero CTE tolerance. I will update them once
+I figured out a recording solution with lower extra latency.
 
 ## Dependencies
 
