@@ -1,6 +1,8 @@
 #ifndef POLYUTILS_H
 #define POLYUTILS_H
 
+#include "Eigen-3.3/Eigen/Core"
+
 // Evaluate a polynomial.
 double polyeval(Eigen::VectorXd coeffs, double x) {
   double result = 0.0;

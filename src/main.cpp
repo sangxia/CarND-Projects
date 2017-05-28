@@ -8,10 +8,10 @@
 #include <uWS/uWS.h>
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
+#include "json.hpp"
 #include "polyutils.h"
 #include "geoutils.h"
 #include "MPC.h"
-#include "json.hpp"
 
 // for convenience
 using json = nlohmann::json;
@@ -179,13 +179,14 @@ int main(int argc, char* argv[]) {
               Eigen::VectorXd::Map(veh_ref_x.data(), veh_ref_x.size()), 
               Eigen::VectorXd::Map(veh_ref_y.data(), veh_ref_y.size()), 
               degree);
+          Eigen::VectorXd coeffs_d = get_poly_derivative(coeffs);
           // Eigen::VectorXd coeffs_d = get_poly_derivative(coeffs);
           Eigen::VectorXd state(6);
           state << 0., 0., 0., v, polyeval(coeffs, 0.), atan(coeffs(1));
           double current_steer = j[1]["steering_angle"];
           double current_throttle = j[1]["throttle"];
-          vector<double> sol = mpc.Solve(state, coeffs, -current_steer * (25.0/180.0*M_PI), 
-              current_throttle);
+          vector<double> sol = mpc.Solve(state, coeffs, coeffs_d,
+              -current_steer * (25.0/180.0*M_PI), current_throttle);
 
           json msgJson;
           

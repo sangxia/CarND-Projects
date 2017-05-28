@@ -6,21 +6,22 @@
 
 using CppAD::AD;
 
-
 class FG_eval {
   public:
     // Coefficients of the fitted polynomial.
     Eigen::VectorXd coeffs;
+    Eigen::VectorXd coeffs_d;
     double Lf;
     double prev_a;
     double prev_delta;
 
     Parameters param;
 
-    FG_eval(Eigen::VectorXd coeffs, Parameters p, double Lf, double prev_delta, 
-        double prev_a) { 
+    FG_eval(Eigen::VectorXd coeffs, Eigen::VectorXd coeffs_d, Parameters p, 
+        double Lf, double prev_delta, double prev_a) { 
       this->param = p;
       this->coeffs = coeffs;
+      this->coeffs_d = coeffs_d;
       this->Lf = Lf;
       this->prev_delta = prev_delta;
       this->prev_a = prev_a;
@@ -28,18 +29,18 @@ class FG_eval {
   
     typedef CPPAD_TESTVECTOR(AD<double>) ADvector;
 
-    AD<double> evalpoly(AD<double> x) {
+    AD<double> evalpoly(AD<double> x, Eigen::VectorXd &p) {
       AD<double> ret = 0.0;
       AD<double> xpow = 1.0;
-      for (int i=0; i<coeffs.size(); i++) {
-        ret += coeffs(i) * xpow;
+      for (int i=0; i<p.size(); i++) {
+        ret += p(i) * xpow;
         xpow *= x;
       }
       return ret;
     }
 
     AD<double> ADmax(AD<double> x) {
-      return (fabs(x) + x) * 0.5;
+      return (CppAD::fabs(x) + x) * 0.5;
     }
 
     // `fg` is a vector containing the cost and constraints.
@@ -52,7 +53,7 @@ class FG_eval {
       double time_weight = 1.0;
       for (int i = 0; i < param.N; i++) {
         fg[0] += time_weight * param.w_cte * 
-          CppAD::pow(ADmax(fabs(vars[param.cte_start + i]) - param.ref_cte), 2);
+          CppAD::pow(ADmax(CppAD::fabs(vars[param.cte_start + i]) - param.ref_cte), 2);
         fg[0] += time_weight * param.w_epsi * 
           CppAD::pow(vars[param.epsi_start + i] - param.ref_epsi, 2);
         fg[0] += time_weight * param.w_v * 
@@ -95,14 +96,14 @@ class FG_eval {
         AD<double> cte1 = vars[param.cte_start + i + 1];
         AD<double> epsi1 = vars[param.epsi_start + i + 1];
         // reference position and orientation
-        AD<double> f1 = evalpoly(x1);
-        AD<double> psides0 = CppAD::atan(coeffs[1]);
+        AD<double> f1 = evalpoly(x1, coeffs);
+        AD<double> psides1 = CppAD::atan(coeffs[1]);
+        // AD<double> psides1 = CppAD::atan(evalpoly(x1, coeffs_d));
         // the actuation at time t.
         fg[2 + param.x_start + i] = x1 - (x0 + v0 * CppAD::cos(psi0) * param.dt);
         fg[2 + param.y_start + i] = y1 - (y0 + v0 * CppAD::sin(psi0) * param.dt);
         fg[2 + param.cte_start + i] = cte1 - (f1 - y1);
-        // TODO below is an approximation, psides0 ought to be some version of psides1
-        fg[2 + param.epsi_start + i] = epsi1 - (psides0 - psi1);
+        fg[2 + param.epsi_start + i] = epsi1 - (psides1 - psi1);
         AD<double> delta0 = vars[param.delta_start + i];
         AD<double> a0 = vars[param.a_start + i];
         fg[2 + param.psi_start + i] = psi1 - (psi0 + v0 * delta0 / Lf * param.dt);
@@ -145,7 +146,7 @@ void MPC::init(double ref_v, double ref_cte, double ref_epsi, double actuator_de
 }
 
 vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs,
-    double prev_delta, double prev_a) {
+    Eigen::VectorXd coeffs_d, double prev_delta, double prev_a) {
   bool ok = true;
   size_t i;
   typedef CPPAD_TESTVECTOR(double) Dvector;
@@ -231,7 +232,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs,
   constraints_upperbound[param.epsi_start] = epsi;
 
   // Object that computes objective and constraints
-  FG_eval fg_eval(coeffs, param, Lf, prev_delta, prev_a);
+  FG_eval fg_eval(coeffs, coeffs_d, param, Lf, prev_delta, prev_a);
 
   // options
   std::string options;
