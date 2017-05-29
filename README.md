@@ -75,6 +75,14 @@ it is actually beneficial to slightly over-estimate the delay. Setting it to
 a better estimate of latency when we take the running time of the optimizer into
 account. Things become erratic when setting it to larger values such as `0.25`.
 
+A final note: the bearing of the reference trajectory of predicted waypoints 
+(`psides1` in the code) is currently calculated as the bearing of the initial
+point, which is technically incorrect. However, a more accurate calculation
+(in the line that was commented out) led to less stable driving. One can argue
+that the current implementation gives a better steering solution in sharp turns.
+I think a better solution here would be to try to model the actuator delay
+better in the kinematic model step.
+
 ## Results
 
 The MPC with the given `params.conf` drives around the car safely at full throttle
