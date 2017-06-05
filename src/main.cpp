@@ -13,7 +13,7 @@
 #include "geoutils.h"
 #include "MPC.h"
 
-#define I_USE_OBSOLETE_VERSIONS
+// #define UWS_VERSION_0_13
 
 // for convenience
 using json = nlohmann::json;
@@ -151,7 +151,7 @@ int main(int argc, char* argv[]) {
   MPC mpc;
   mpc.init(ref_v, ref_cte, ref_epsi, actuator_delay, w_v, w_cte, w_epsi, w_delta, w_a, w_ddelta, w_da,
       time_discount, N, dt, verbose);
-#ifdef I_USE_OBSOLETE_VERSIONS
+#ifdef UWS_VERSION_0_13
   h.onMessage(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>, char*, size_t, uWS::OpCode)>>(
       [&mpc, &degree, &draw_ref, &draw_mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
@@ -240,7 +240,7 @@ int main(int argc, char* argv[]) {
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
           this_thread::sleep_for(chrono::milliseconds(100));
-#ifdef I_USE_OBSOLETE_VERSIONS
+#ifdef UWS_VERSION_0_13
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
 #else
           ws->send(msg.data(), msg.length(), uWS::OpCode::TEXT);
@@ -249,7 +249,7 @@ int main(int argc, char* argv[]) {
       } else {
         // Manual driving
         std::string msg = "42[\"manual\",{}]";
-#ifdef I_USE_OBSOLETE_VERSIONS
+#ifdef UWS_VERSION_0_13
         ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
 #else
         ws->send(msg.data(), msg.length(), uWS::OpCode::TEXT);
@@ -272,7 +272,7 @@ int main(int argc, char* argv[]) {
     }
   });
 
-#ifdef I_USE_OBSOLETE_VERSIONS
+#ifdef UWS_VERSION_0_13
   h.onConnection(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>, uWS::HttpRequest)>>(
         [&h](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) {
 #else
@@ -282,7 +282,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Connected!!!" << std::endl;
   }));
 
-#ifdef I_USE_OBSOLETE_VERSIONS
+#ifdef UWS_VERSION_0_13
   h.onDisconnection(static_cast<std::function<void(uWS::WebSocket<uWS::SERVER>, int, char*, size_t)>>(
       [&h](uWS::WebSocket<uWS::SERVER> ws, int code,
                          char *message, size_t length) {
@@ -291,7 +291,7 @@ int main(int argc, char* argv[]) {
       [&h](uWS::WebSocket<uWS::SERVER> *ws, int code,
                          char *message, size_t length) {
 #endif
-#ifdef I_USE_OBSOLETE_VERSIONS
+#ifdef UWS_VERSION_0_13
     ws.close();
 #else
     ws->close();
