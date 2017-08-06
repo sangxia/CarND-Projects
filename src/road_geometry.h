@@ -1,5 +1,6 @@
 #include <math.h>
 #include <vector>
+#include <iostream>
 
 using namespace std;
 
@@ -12,7 +13,7 @@ double distance(double x1, double y1, double x2, double y2) {
 	return sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
 }
 
-int ClosestWaypoint(double x, double y, vector<double> maps_x, vector<double> maps_y) {
+int ClosestWaypoint(double x, double y, vector<double> &maps_x, vector<double> &maps_y) {
 	double closestLen = 100000; //large number
 	int closestWaypoint = 0;
 	for(int i = 0; i < maps_x.size(); i++) {
@@ -27,20 +28,25 @@ int ClosestWaypoint(double x, double y, vector<double> maps_x, vector<double> ma
 	return closestWaypoint;
 }
 
-int NextWaypoint(double x, double y, double theta, vector<double> maps_x, vector<double> maps_y) {
+int NextWaypoint(double x, double y, double theta, vector<double> &maps_x, vector<double> &maps_y) {
 	int closestWaypoint = ClosestWaypoint(x,y,maps_x,maps_y);
 	double map_x = maps_x[closestWaypoint];
 	double map_y = maps_y[closestWaypoint];
 	double heading = atan2( (map_y-y),(map_x-x) );
 	double angle = abs(theta-heading);
-	if(angle > pi()/4) {
+  if (angle > pi()) {
+    // i think not including this is a bug in the official template
+    angle = abs(2*pi()-angle);
+  }
+	if(angle > pi()/2) {
+    std::cout << '+' << closestWaypoint << " " << heading << " " << theta << std::endl;
 		closestWaypoint++;
 	}
 	return closestWaypoint;
 }
 
 // Transform from Cartesian x,y coordinates to Frenet s,d coordinates
-vector<double> getFrenet(double x, double y, double theta, vector<double> maps_x, vector<double> maps_y) {
+vector<double> getFrenet(double x, double y, double theta, vector<double> &maps_x, vector<double> &maps_y) {
 	int next_wp = NextWaypoint(x,y, theta, maps_x,maps_y);
 	int prev_wp;
 	if(next_wp == 0) {
@@ -77,7 +83,7 @@ vector<double> getFrenet(double x, double y, double theta, vector<double> maps_x
 }
 
 // Transform from Frenet s,d coordinates to Cartesian x,y
-vector<double> getXY(double s, double d, vector<double> maps_s, vector<double> maps_x, vector<double> maps_y) {
+vector<double> getXY(double s, double d, vector<double> &maps_s, vector<double> &maps_x, vector<double> &maps_y) {
 	int prev_wp = -1;
 	while(s > maps_s[prev_wp+1] && (prev_wp < (int)(maps_s.size()-1) )) {
 		prev_wp++;
@@ -96,8 +102,9 @@ vector<double> getXY(double s, double d, vector<double> maps_s, vector<double> m
 
 // Transform from Cartesian x,y coordinates to Frenet s,d coordinates
 vector<double> getFrenetWithSpeed(double x, double y, double theta, double speed,
-    vector<double> maps_x, vector<double> maps_y) {
+    vector<double> &maps_x, vector<double> &maps_y) {
 	int next_wp = NextWaypoint(x,y, theta, maps_x,maps_y);
+  std::cout << "next_wp" << next_wp << " dist " << distance(x,y,maps_x[next_wp],maps_y[next_wp]) << std::endl;
 	int prev_wp;
 	if(next_wp == 0) {
 		prev_wp  = maps_x.size()-1;
@@ -118,6 +125,7 @@ vector<double> getFrenetWithSpeed(double x, double y, double theta, double speed
 	double proj_x = proj_norm*n_x;
 	double proj_y = proj_norm*n_y;
 	double frenet_d = distance(x_x,x_y,proj_x,proj_y);
+  std::cout << "proj " << proj_x << " " << proj_y << std::endl;
   //
 	double proj_norm_next = (next_x*n_x+next_y*n_y)/(n_x*n_x+n_y*n_y);
 	double proj_x_next = proj_norm_next*n_x;
@@ -143,3 +151,9 @@ vector<double> getFrenetWithSpeed(double x, double y, double theta, double speed
 	return {frenet_s,frenet_d, delta_s, delta_d};
 }
 
+vector<double> getFrenetWithXYSpeed(double x, double y, double speed_x, double speed_y,
+    vector<double> &maps_x, vector<double> &maps_y) {
+  double speed = distance(speed_x, speed_y, 0, 0);
+  double theta = atan2(speed_y, speed_x);
+  return getFrenetWithSpeed(x, y, theta, speed, maps_x, maps_y);
+}
