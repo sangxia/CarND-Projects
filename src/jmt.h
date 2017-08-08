@@ -117,7 +117,9 @@ void generateTrajectory(
   int wp = NextWaypoint(curr_x, curr_y, start_theta, maps_x, maps_y);
   std::cout << "next wp id " << wp << std::endl;
   while (tmp_dist < target_time*target_speed) {
+    std::cout << "next wp id " << wp << " s " << maps_s[wp] << std::endl;
     vector<double> p = getXY(maps_s[wp], curr_d, maps_s, maps_x, maps_y);
+    std::cout << p[0] << " " << p[1] << std::endl;
     double dst = distance(p[0], p[1], curr_x, curr_y);
     if (tmp_dist+dst <= target_time*target_speed) {
       target_x.push_back(p[0]);

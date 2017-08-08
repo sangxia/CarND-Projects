@@ -53,8 +53,9 @@ int NextWaypoint(double x, double y, double theta, vector<double> &maps_x, vecto
     angle = abs(2*pi()-angle);
   }
 	if(angle > pi()/2) {
-    std::cout << '+' << closestWaypoint << " " << heading << " " << theta << std::endl;
-		closestWaypoint++;
+    // std::cout << '+' << closestWaypoint << " " << heading << " " << theta << std::endl;
+    // bug fix
+		closestWaypoint = (closestWaypoint+1) % maps_x.size();
 	}
 	return closestWaypoint;
 }
@@ -110,10 +111,19 @@ vector<double> getFrenet(double x, double y, double theta, vector<double> &maps_
 
 // Transform from Frenet s,d coordinates to Cartesian x,y
 vector<double> getXY(double s, double d, vector<double> &maps_s, vector<double> &maps_x, vector<double> &maps_y) {
+  // bug fix for caluclating between the last and first waypoint
+  int map_size = maps_s.size();
 	int prev_wp = -1;
-	while(s > maps_s[prev_wp+1] && (prev_wp < (int)(maps_s.size()-1) )) {
-		prev_wp++;
-	}
+  if (s < 1e-5) {
+    std::cout << "b1" << std::endl;
+    s = maps_s[map_size-1] + distance(maps_x[map_size-1],maps_y[map_size-1],maps_x[0],maps_y[0]) + s;
+    prev_wp = map_size-1;
+  } else {
+    std::cout << "b2" << std::endl;
+    while(s > maps_s[prev_wp+1] && (prev_wp < (int)(maps_s.size()-1) )) {
+      prev_wp++;
+    }
+  }
 	int wp2 = (prev_wp+1)%maps_x.size();
 	double heading = atan2((maps_y[wp2]-maps_y[prev_wp]),(maps_x[wp2]-maps_x[prev_wp]));
 	// the x,y,s along the segment

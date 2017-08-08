@@ -71,6 +71,7 @@ int main() {
   	map_waypoints_dx.push_back(d_x);
   	map_waypoints_dy.push_back(d_y);
   }
+  std::cout << map_waypoints_s.size() << std::endl;
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
@@ -134,7 +135,7 @@ int main() {
               vector<double> next_x_vals;
               vector<double> next_y_vals;
               generateTrajectory(map_waypoints_s, map_waypoints_x, map_waypoints_y, map_waypoints_dx, map_waypoints_dy, previous_path_x, previous_path_y,
-                  car_s, car_d, car_x, car_y, car_yaw, car_speed, 4, 10, next_x_vals, next_y_vals);
+                  car_s, car_d, car_x, car_y, car_yaw, car_speed, 4, 15, next_x_vals, next_y_vals);
               msgJson["next_x"] = next_x_vals;
               msgJson["next_y"] = next_y_vals;
             }
