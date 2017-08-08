@@ -140,7 +140,14 @@ int main() {
             }
 
             if (detectCollision(obstacle_x, obstacle_y, msgJson["next_x"], msgJson["next_y"], 3.0)) {
+              vector<double> next_x_vals;
+              vector<double> next_y_vals;
               std::cout <<  "COLLISION!" << std::endl;
+              generateTrajectory(map_waypoints_s, map_waypoints_x, map_waypoints_y, previous_path_x, previous_path_y,
+                  car_s, car_d, car_x, car_y, car_yaw, car_speed, 3, 10, next_x_vals, next_y_vals);
+              msgJson["next_x"] = next_x_vals;
+              msgJson["next_y"] = next_y_vals;
+              std::cout << "regened" << std::endl;
             }
             
 

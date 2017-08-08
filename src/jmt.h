@@ -172,6 +172,7 @@ void generateTrajectory(
         std::cout << " reached target end " << std::endl;
         nxt_yaw = curr_yaw;
       }
+      nxt_yaw = atan2(sin(curr_yaw)+sin(nxt_yaw), cos(curr_yaw)+cos(nxt_yaw));
       std::cout << "next yaw " << nxt_yaw << std::endl;
       double tx=target_x[tp];
       double dtx=target_speed*cos(nxt_yaw);
