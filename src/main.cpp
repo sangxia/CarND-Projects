@@ -113,12 +113,17 @@ int main() {
 
           	// Sensor Fusion Data, a list of all other cars on the same side of the road.
           	auto sensor_fusion = j[1]["sensor_fusion"];
+            
             /*
             for (auto itr = sensor_fusion.begin(); itr != sensor_fusion.end(); itr++) {
               std::cout << *itr << std::endl;
             }
             std::cout << std::endl;
             */
+
+            double time_limit = 3.0;
+            vector<vector<double>> obstacle_x(int(time_limit/0.2)), obstacle_y(int(time_limit/0.2));
+            generateObstacle(sensor_fusion, time_limit, obstacle_x, obstacle_y);
 
           	json msgJson;
             
@@ -129,12 +134,15 @@ int main() {
               vector<double> next_x_vals;
               vector<double> next_y_vals;
               generateTrajectory(map_waypoints_s, map_waypoints_x, map_waypoints_y, previous_path_x, previous_path_y,
-                  car_s, car_d, car_x, car_y, car_yaw, car_speed, 3, 15, next_x_vals, next_y_vals);
+                  car_s, car_d, car_x, car_y, car_yaw, car_speed, 3, 20, next_x_vals, next_y_vals);
               msgJson["next_x"] = next_x_vals;
               msgJson["next_y"] = next_y_vals;
             }
-            
 
+            if (detectCollision(obstacle_x, obstacle_y, msgJson["next_x"], msgJson["next_y"], 3.0)) {
+              std::cout <<  "COLLISION!" << std::endl;
+            }
+            
 
           	auto msg = "42[\"control\","+ msgJson.dump()+"]";
 

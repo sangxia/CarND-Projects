@@ -60,6 +60,8 @@ double evalpoly(vector<double> p, double x) {
   return result;
 }
 
+
+
 void generateTrajectory(
     vector<double> &maps_s,
     vector<double> &maps_x, vector<double> &maps_y, 
@@ -86,7 +88,7 @@ void generateTrajectory(
   double tmp_dist = 0.0;
   if (prev_path_x.size() > 0) {
     int lim = 10;
-    for (int i=1; i<lim-1; i++) {
+    for (int i=0; i<lim-1; i++) {
       trajectory_x.push_back(prev_path_x[i]);
       trajectory_y.push_back(prev_path_y[i]);
       tmp_dist += distance(prev_path_x[i], prev_path_y[i], curr_x, curr_y);
@@ -207,6 +209,40 @@ void generateTrajectory(
     ts += 0.02;
   }
   std::cout << std::endl;
+}
+
+bool detectCollision(vector<vector<double>> const &obstacle_x, vector<vector<double>> const &obstacle_y,
+    vector<double> const &trajectory_x, vector<double> const &trajectory_y, double time_limit, double tolerance=4) {
+  int idx_t=0, idx_c=0;
+  // std::cout << "obstacle size " << obstacle_x[0].size() << " traj size " << trajectory_x.size() << std::endl;
+  // std::cout << "next point " << trajectory_x[0] << " " << trajectory_y[0] << std::endl;
+  while (idx_t<trajectory_x.size() && idx_c<obstacle_x.size()) {
+    double curr_x=trajectory_x[idx_t], curr_y=trajectory_y[idx_t];
+    for (int i=0; i<obstacle_x[idx_c].size(); i++) {
+      // std::cout << distance(curr_x,curr_y,obstacle_x[idx_c][i],obstacle_y[idx_c][i]) << std::endl;
+      if (distance(curr_x,curr_y,obstacle_x[idx_c][i],obstacle_y[idx_c][i])<tolerance) {
+        return true;
+      }
+    }
+    idx_t += 10;
+    idx_c += 1;
+  }
+  return false;
+}
+
+void generateObstacle(vector<vector<double>> const &sensor_fusion, double time_limit, 
+    vector<vector<double>> &obstacle_x, vector<vector<double>> &obstacle_y) {
+  for (int i=0; i<int(time_limit/0.2); i++) {
+    obstacle_x[i].clear();
+    obstacle_y[i].clear();
+  }
+  for (auto itr=sensor_fusion.begin(); itr != sensor_fusion.end(); itr++) {
+    for (int i=0; i<int(time_limit/0.2); i++) {
+      obstacle_x[i].push_back((*itr)[1]+i*0.2*(*itr)[3]);
+      obstacle_y[i].push_back((*itr)[2]+i*0.2*(*itr)[4]);
+      // std::cout << i << " " << (*itr)[1]+i*0.2*(*itr)[3] << " " << (*itr)[2]+i*0.2*(*itr)[4] << std::endl;
+    }
+  }
 }
 
 #endif
