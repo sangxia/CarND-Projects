@@ -65,6 +65,7 @@ double evalpoly(vector<double> p, double x) {
 void generateTrajectory(
     vector<double> &maps_s,
     vector<double> &maps_x, vector<double> &maps_y, 
+    vector<double> &maps_dx, vector<double> &maps_dy, 
     vector<double> const &prev_path_x, vector<double> const &prev_path_y, 
     double start_s, double start_d,
     double start_x, double start_y, double start_theta, double start_speed,
@@ -82,9 +83,10 @@ void generateTrajectory(
 
   // if has previous trajectory, preserve the first few points
   // then generate new trajectory from the last point
-  vector<double> target_x, target_y, target_t;
+  vector<double> target_x, target_y, target_yaw, target_t;
   double curr_x = start_x;
   double curr_y = start_y;
+  double curr_yaw = start_theta;
   double tmp_dist = 0.0;
   if (prev_path_x.size() > 0) {
     int lim = 10;
@@ -94,18 +96,20 @@ void generateTrajectory(
       tmp_dist += distance(prev_path_x[i], prev_path_y[i], curr_x, curr_y);
       curr_x = prev_path_x[i];
       curr_y = prev_path_y[i];
-      std::cout << "trj " << prev_path_x[i] << " " << prev_path_y[i] << std::endl;
+      //std::cout << "trj " << prev_path_x[i] << " " << prev_path_y[i] << std::endl;
     }
     target_x.push_back(prev_path_x[lim-1]);
     target_y.push_back(prev_path_y[lim-1]);
+    curr_yaw = atan2(prev_path_y[lim-1]-prev_path_y[lim-2],prev_path_x[lim-1]-prev_path_x[lim-2]);
+    target_yaw.push_back(curr_yaw);
     target_t.push_back((lim-1)*0.02);
     double last_speed = distance(prev_path_x[lim-2],prev_path_y[lim-2],prev_path_x[lim-1],prev_path_y[lim-1])/0.02;
-    double last_yaw = atan2(prev_path_y[lim-1]-prev_path_y[lim-2],prev_path_x[lim-1]-prev_path_x[lim-2]);
-    start_speed_x = last_speed*cos(last_yaw);
-    start_speed_y = last_speed*sin(last_yaw);
+    start_speed_x = last_speed*cos(curr_yaw);
+    start_speed_y = last_speed*sin(curr_yaw);
   } else {
     target_x.push_back(curr_x);
     target_y.push_back(curr_y);
+    target_yaw.push_back(curr_yaw);
     target_t.push_back(0.0);
   }
 
@@ -118,6 +122,7 @@ void generateTrajectory(
     if (tmp_dist+dst <= target_time*target_speed) {
       target_x.push_back(p[0]);
       target_y.push_back(p[1]);
+      target_yaw.push_back(atan2(maps_dx[wp], -maps_dy[wp]));
       tmp_dist += dst;
       target_t.push_back(tmp_dist/target_speed);
       curr_x = p[0];
@@ -126,9 +131,11 @@ void generateTrajectory(
       double r = (target_time*target_speed-tmp_dist) / dst;
       double x = curr_x + (p[0]-curr_x)*r;
       double y = curr_y + (p[1]-curr_y)*r;
+      double tgt_yaw = curr_yaw + r*angleDiff(atan2(maps_dx[wp], -maps_dy[wp]), curr_yaw);
       target_x.push_back(x);
       target_y.push_back(y);
       target_t.push_back(target_time);
+      target_yaw.push_back(tgt_yaw);
       break;
     }
     if (wp < maps_s.size()-1) {
@@ -137,11 +144,13 @@ void generateTrajectory(
       wp = 0;
     }
   }
+  /*
   std::cout << "targets: ";
   for (int i=0; i<target_x.size(); i++) {
     std::cout << "(" << target_x[i] << "," << target_y[i] << ")@" << target_t[i] << " ";
   }
   std::cout << std::endl;
+  */
 
   double ts = target_t[0];
   double ts_shift = 0.0;
@@ -152,13 +161,12 @@ void generateTrajectory(
   double y=target_y[0]; 
   double dy=start_speed_y; 
   double ddy = 0.0;
-  double curr_yaw;
   if (start_speed > 1e-2) { 
     curr_yaw = atan2(dy,dx);
   } else {
     curr_yaw = start_theta;
   }
-  std::cout << "curr yaw " << curr_yaw << std::endl;
+  //std::cout << "curr yaw " << curr_yaw << std::endl;
   double nxt_yaw;
   vector<double> px, py;
   while (ts < target_time) {
@@ -166,6 +174,8 @@ void generateTrajectory(
       ts_shift = ts - target_t[tp];
       std::cout << "ts " << ts << " " << target_t[tp] << std::endl;
       tp++;
+      nxt_yaw = target_yaw[tp];
+      /*
       if (tp < target_x.size()-1) {
         nxt_yaw = atan2(target_y[tp+1]-target_y[tp], target_x[tp+1]-target_x[tp]);
       } else {
@@ -174,6 +184,8 @@ void generateTrajectory(
       }
       nxt_yaw = atan2(sin(curr_yaw)+sin(nxt_yaw), cos(curr_yaw)+cos(nxt_yaw));
       std::cout << "next yaw " << nxt_yaw << std::endl;
+      */
+      // TODO better acceleration calculation
       double tx=target_x[tp];
       double dtx=target_speed*cos(nxt_yaw);
       double ddtx = 0.0;
@@ -185,11 +197,11 @@ void generateTrajectory(
       py = JMT(y,dy,ddy,ty,dty,ddty,target_t[tp]-ts);
       std::cout << "---" << std::endl;
       for (int i=0; i<px.size(); i++) {
-        std::cout << " " << px[i];
+        std::cout << "," << px[i];
       }
       std::cout << std::endl;
       for (int i=0; i<py.size(); i++) {
-        std::cout << " " << py[i];
+        std::cout << "," << py[i];
       }
       std::cout << std::endl;
       std::cout << "---" << std::endl;

@@ -127,28 +127,30 @@ int main() {
 
           	json msgJson;
             
-            if (previous_path_x.size() > 100) {
+            if (previous_path_x.size() > 180) {
               msgJson["next_x"] = previous_path_x;
               msgJson["next_y"] = previous_path_y;
             } else {
               vector<double> next_x_vals;
               vector<double> next_y_vals;
-              generateTrajectory(map_waypoints_s, map_waypoints_x, map_waypoints_y, previous_path_x, previous_path_y,
-                  car_s, car_d, car_x, car_y, car_yaw, car_speed, 3, 20, next_x_vals, next_y_vals);
+              generateTrajectory(map_waypoints_s, map_waypoints_x, map_waypoints_y, map_waypoints_dx, map_waypoints_dy, previous_path_x, previous_path_y,
+                  car_s, car_d, car_x, car_y, car_yaw, car_speed, 4, 10, next_x_vals, next_y_vals);
               msgJson["next_x"] = next_x_vals;
               msgJson["next_y"] = next_y_vals;
             }
 
+            /*
             if (detectCollision(obstacle_x, obstacle_y, msgJson["next_x"], msgJson["next_y"], 3.0)) {
               vector<double> next_x_vals;
               vector<double> next_y_vals;
               std::cout <<  "COLLISION!" << std::endl;
-              generateTrajectory(map_waypoints_s, map_waypoints_x, map_waypoints_y, previous_path_x, previous_path_y,
+              generateTrajectory(map_waypoints_s, map_waypoints_x, map_waypoints_y, map_waypoints_dx, map_waypoints_dy, previous_path_x, previous_path_y,
                   car_s, car_d, car_x, car_y, car_yaw, car_speed, 3, 10, next_x_vals, next_y_vals);
               msgJson["next_x"] = next_x_vals;
               msgJson["next_y"] = next_y_vals;
               std::cout << "regened" << std::endl;
             }
+            */
             
 
           	auto msg = "42[\"control\","+ msgJson.dump()+"]";
