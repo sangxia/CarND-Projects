@@ -122,14 +122,14 @@ int main() {
 
           	json msgJson;
             
-            if (previous_path_x.size() > 60) {
+            if (previous_path_x.size() > 100) {
               msgJson["next_x"] = previous_path_x;
               msgJson["next_y"] = previous_path_y;
             } else {
               vector<double> next_x_vals;
               vector<double> next_y_vals;
               generateTrajectory(map_waypoints_s, map_waypoints_x, map_waypoints_y, previous_path_x, previous_path_y,
-                  car_s, car_d, car_x, car_y, car_yaw, car_speed, 3, 8, next_x_vals, next_y_vals);
+                  car_s, car_d, car_x, car_y, car_yaw, car_speed, 3, 15, next_x_vals, next_y_vals);
               msgJson["next_x"] = next_x_vals;
               msgJson["next_y"] = next_y_vals;
             }

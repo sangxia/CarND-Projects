@@ -85,7 +85,7 @@ void generateTrajectory(
   double curr_y = start_y;
   double tmp_dist = 0.0;
   if (prev_path_x.size() > 0) {
-    int lim = 8;
+    int lim = 10;
     for (int i=1; i<lim-1; i++) {
       trajectory_x.push_back(prev_path_x[i]);
       trajectory_y.push_back(prev_path_y[i]);
@@ -200,7 +200,7 @@ void generateTrajectory(
     }
     double traj_x=evalpoly(px, ts_shift);
     double traj_y=evalpoly(py, ts_shift);
-    std::cout << "time " << ts << " " << traj_x << " " << traj_y << std::endl;
+    // std::cout << "time " << ts << " " << traj_x << " " << traj_y << std::endl;
     trajectory_x.push_back(traj_x);
     trajectory_y.push_back(traj_y);
     ts_shift += 0.02;
