@@ -10,9 +10,12 @@
 #include "json.hpp"
 
 #include "road_geometry.h"
-#include "spline.h"
+//#include "spline.h"
+#include "jmt.h"
 
 using namespace std;
+using Eigen::MatrixXd;
+using Eigen::VectorXd;
 
 // for convenience
 using json = nlohmann::json;
@@ -94,7 +97,9 @@ int main() {
           	double car_s = j[1]["s"];
           	double car_d = j[1]["d"];
           	double car_yaw = j[1]["yaw"];
+            car_yaw = deg2rad(car_yaw);
           	double car_speed = j[1]["speed"];
+            car_speed = car_speed / 3.6;
 
             while (car_yaw > 2*pi()) { car_yaw -= 2*pi(); }
             while (car_yaw < -2*pi()) { car_yaw += 2*pi(); }
@@ -116,43 +121,20 @@ int main() {
             */
 
           	json msgJson;
-
-            int prev_len = previous_path_x.size();
-            if (prev_len >= 3) {
-              prev_len = 3;
+            
+            if (previous_path_x.size() > 60) {
+              msgJson["next_x"] = previous_path_x;
+              msgJson["next_y"] = previous_path_y;
+            } else {
+              vector<double> next_x_vals;
+              vector<double> next_y_vals;
+              generateTrajectory(map_waypoints_s, map_waypoints_x, map_waypoints_y, previous_path_x, previous_path_y,
+                  car_s, car_d, car_x, car_y, car_yaw, car_speed, 3, 8, next_x_vals, next_y_vals);
+              msgJson["next_x"] = next_x_vals;
+              msgJson["next_y"] = next_y_vals;
             }
-            int waypoint_lim = 90;
-            int waypoint_mod = 30;
-            vector<double> future_waypoints_x(waypoint_lim / waypoint_mod); 
-            vector<double> future_waypoints_y(waypoint_lim / waypoint_mod);
-            vector<double> future_timepoints(waypoint_lim / waypoint_mod);
-            for (int i=0; i<waypoint_lim / waypoint_mod; i++) {
-              if (i*waypoint_mod < prev_len) {
-                future_waypoints_x[i] = previous_path_x[i * waypoint_mod];
-                future_waypoints_y[i] = previous_path_y[i * waypoint_mod];
-              } else {
-                double nxt_s = car_s + 0.2*i*waypoint_mod;
-                double nxt_d = car_d;
-                vector<double> nxt_xy = getXY(nxt_s, nxt_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-                future_waypoints_x[i] = nxt_xy[0];
-                future_waypoints_y[i] = nxt_xy[1];
-              }
-              future_timepoints[i] = i*waypoint_mod;
-            }
-            tk::spline sx, sy;
-            sx.set_points(future_timepoints, future_waypoints_x);
-            sy.set_points(future_timepoints, future_waypoints_y);
+            
 
-          	vector<double> next_x_vals;
-          	vector<double> next_y_vals;
-            for (int i=0; i<waypoint_lim; i++) {
-              next_x_vals.push_back(sx(i));
-              next_y_vals.push_back(sy(i));
-            }
-
-          	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
-          	msgJson["next_x"] = next_x_vals;
-          	msgJson["next_y"] = next_y_vals;
 
           	auto msg = "42[\"control\","+ msgJson.dump()+"]";
 

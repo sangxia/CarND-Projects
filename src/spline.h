@@ -104,6 +104,10 @@ public:
         ;
     }
 
+    std::vector<std::vector<double>> get_coefs() {
+      return {m_a, m_b, m_c};
+    }
+
     // optional, but if called it has to come be before set_points()
     void set_boundary(bd_type left, double left_value,
                       bd_type right, double right_value,

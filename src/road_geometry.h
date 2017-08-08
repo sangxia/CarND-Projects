@@ -1,3 +1,6 @@
+#ifndef _ROAD_GEOMETRY_H_
+#define _ROAD_GEOMETRY_H_
+
 #include <math.h>
 #include <vector>
 #include <iostream>
@@ -43,6 +46,18 @@ int NextWaypoint(double x, double y, double theta, vector<double> &maps_x, vecto
 		closestWaypoint++;
 	}
 	return closestWaypoint;
+}
+
+int NextWaypoint(double s, vector<double> &maps_s) {
+  // TODO deduct total length
+  if (s >= maps_s[maps_s.size()-1]) {
+    return 0;
+  }
+  int ret = 0;
+  while (s >= maps_s[ret]) {
+    ret++;
+  }
+  return ret;
 }
 
 // Transform from Cartesian x,y coordinates to Frenet s,d coordinates
@@ -157,3 +172,6 @@ vector<double> getFrenetWithXYSpeed(double x, double y, double speed_x, double s
   double theta = atan2(speed_y, speed_x);
   return getFrenetWithSpeed(x, y, theta, speed, maps_x, maps_y);
 }
+
+#endif
+
