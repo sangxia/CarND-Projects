@@ -8,20 +8,17 @@
 
 using namespace std;
 
-void generateTrajectory(
+void generateSingleTrajectory(
     vector<double> &maps_s,
     vector<double> &maps_x, vector<double> &maps_y, 
-    vector<double> &maps_dx, vector<double> &maps_dy, 
     vector<double> const &prev_path_x, vector<double> const &prev_path_y, 
     double start_s, double start_d,
     double start_x, double start_y, double start_theta, double start_speed,
-    double target_time, double target_speed, 
+    double target_time, double target_speed, double target_d,
     vector<double> &trajectory_x, vector<double> &trajectory_y) {
 
   trajectory_x.clear();
   trajectory_y.clear();
-
-  int curr_d = 6.0; // TODO make this adaptive
 
   // if has previous trajectory, preserve the first few points
   // then generate new trajectory from the last point
@@ -36,9 +33,6 @@ void generateTrajectory(
   int prev_lim = 20;
   if (prev_path_x.size() > 0) {
     for (int i=0; i<prev_lim; i++) {
-      // trajectory_x.push_back(prev_path_x[i]);
-      // trajectory_y.push_back(prev_path_y[i]);
-
       curr_p = transformToEgo(start_x,start_y,start_theta,
           prev_path_x[i], prev_path_y[i]);
       tmp_dist += distance(prev_path_x[i], prev_path_y[i], curr_x, curr_y);
@@ -66,7 +60,7 @@ void generateTrajectory(
   while (target_x.size() < min_target_size || 
       tmp_dist < target_time*target_speed) {
     //std::cout << "next wp id " << wp << " s " << maps_s[wp] << std::endl;
-    vector<double> p = getXY(maps_s[wp], curr_d, maps_s, maps_x, maps_y);
+    vector<double> p = getXY(maps_s[wp], target_d, maps_s, maps_x, maps_y);
     //std::cout << p[0] << " " << p[1] << std::endl;
     double dst = distance(p[0], p[1], curr_x, curr_y);
     curr_p = transformToEgo(start_x,start_y,start_theta,p[0],p[1]);
@@ -87,21 +81,10 @@ void generateTrajectory(
   tk::spline sy;
   sy.set_points(target_t, target_y);
   for (double t=0.0; t<target_time; t+=0.02) {
-  //for (double t=0.02*(min(int(prev_path_x.size()), prev_lim)); t<target_time; t+=0.02) {
     curr_p = transformFromEgo(start_x,start_y,start_theta,sx(t),sy(t));
-    //std::cout << " " << curr_p[0] << " " << curr_p[1];
     trajectory_x.push_back(curr_p[0]);
     trajectory_y.push_back(curr_p[1]);
   }
-  //std::cout << std::endl;
-  //
-  /*
-  std::cout << "start " << start_x << " " << start_y << std::endl;
-  for (int i=0; i<40; i++) {
-    std::cout << trajectory_x[i] << " " << trajectory_y[i] << std::endl;
-  }
-  std::cout << std::endl;
-  */
 }
 
 bool detectCollision(vector<vector<double>> const &obstacle_x, vector<vector<double>> const &obstacle_y,
@@ -135,6 +118,46 @@ void generateObstacle(vector<vector<double>> const &sensor_fusion, double time_l
       obstacle_y[i].push_back((*itr)[2]+i*0.2*(*itr)[4]);
       // std::cout << i << " " << (*itr)[1]+i*0.2*(*itr)[3] << " " << (*itr)[2]+i*0.2*(*itr)[4] << std::endl;
     }
+  }
+}
+
+void generateTrajectory(
+    vector<double> &maps_s,
+    vector<double> &maps_x, vector<double> &maps_y, 
+    vector<double> const &prev_path_x, vector<double> const &prev_path_y, 
+    vector<vector<double>> const &obstacle_x, vector<vector<double>> const &obstacle_y,
+    double start_s, double start_d,
+    double start_x, double start_y, double start_theta, double start_speed,
+    double target_time, double target_speed, 
+    vector<double> &trajectory_x, vector<double> &trajectory_y) {
+
+  // sort the lane_d by distance
+  vector<double> lane_dist(3);
+  lane_dist[0]=2;
+  lane_dist[1]=6;
+  lane_dist[2]=10;
+  for (int i=0; i<2; i++) {
+    for (int j=i+1; j<3; j++) {
+      if (fabs(lane_dist[i]-start_d) > fabs(lane_dist[j]-start_d)) {
+        double tmp = lane_dist[i];
+        lane_dist[i] = lane_dist[j];
+        lane_dist[j] = tmp;
+      }
+    }
+  }
+  //std::cout <<start_d << " " << lane_dist[0] << " " << lane_dist[1] << std::endl;
+  while (1) {
+    for (int i=0; i<3; i++) {
+      std::cout << lane_dist[i] << " " << target_speed << std::endl;
+      generateSingleTrajectory(maps_s, maps_x, maps_y, prev_path_x, prev_path_y,
+          start_s, start_d, start_x, start_y, start_theta, start_speed,
+          target_time, target_speed, lane_dist[i],
+          trajectory_x, trajectory_y);
+      if (!detectCollision(obstacle_x,obstacle_y,trajectory_x,trajectory_y, 3.0)) {
+        return;
+      }
+    }
+    target_speed *= 0.9;
   }
 }
 
