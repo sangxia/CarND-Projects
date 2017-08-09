@@ -71,9 +71,14 @@ int main() {
   	map_waypoints_dx.push_back(d_x);
   	map_waypoints_dy.push_back(d_y);
   }
-  std::cout << map_waypoints_s.size() << std::endl;
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  int map_waypoints_size = map_waypoints_s.size();
+  double track_len = map_waypoints_s[map_waypoints_size-1] + 
+    distance(map_waypoints_x[0],map_waypoints_y[0],map_waypoints_x[map_waypoints_size-1],map_waypoints_y[map_waypoints_size-1]);
+
+  double target_speed = 0.0;
+
+  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy,&track_len,&target_speed](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -100,7 +105,7 @@ int main() {
           	double car_yaw = j[1]["yaw"];
             car_yaw = deg2rad(car_yaw);
           	double car_speed = j[1]["speed"];
-            car_speed = car_speed / 3.6;
+            car_speed = car_speed *1.61 / 3.6;
 
             while (car_yaw > 2*pi()) { car_yaw -= 2*pi(); }
             while (car_yaw < -2*pi()) { car_yaw += 2*pi(); }
@@ -122,11 +127,6 @@ int main() {
             std::cout << std::endl;
             */
 
-            double obstacle_time_limit = 3.0;
-            vector<vector<double>> obstacle_x(int(obstacle_time_limit/0.2)), 
-              obstacle_y(int(obstacle_time_limit/0.2));
-            generateObstacle(sensor_fusion, obstacle_time_limit, obstacle_x, obstacle_y);
-
           	json msgJson;
             
             if (previous_path_x.size() > 180) {
@@ -135,9 +135,17 @@ int main() {
             } else {
               vector<double> next_x_vals;
               vector<double> next_y_vals;
+              int proposal = scoreProposal(car_s,car_d,car_speed,track_len,1,false,sensor_fusion);
+              if (proposal == 2) {
+                target_speed = min(20.0, car_speed+0.5);
+              } else if (proposal == 0) {
+                target_speed = max(car_speed-0.6, 5.0);
+              } else if (proposal == -1) {
+                target_speed = max(car_speed-1, 5.0);
+              }
+              std::cout << "car speed " << car_speed << " target speed " << target_speed << std::endl;
               generateTrajectory(map_waypoints_s, map_waypoints_x, map_waypoints_y, previous_path_x, previous_path_y,
-                  obstacle_x, obstacle_y,
-                  car_s, car_d, car_x, car_y, car_yaw, car_speed, 4, 20, next_x_vals, next_y_vals);
+                  car_s, car_d, car_x, car_y, car_yaw, car_speed, 4, target_speed, 6., next_x_vals, next_y_vals);
               msgJson["next_x"] = next_x_vals;
               msgJson["next_y"] = next_y_vals;
             }

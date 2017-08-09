@@ -8,7 +8,7 @@
 
 using namespace std;
 
-void generateSingleTrajectory(
+void generateTrajectory(
     vector<double> &maps_s,
     vector<double> &maps_x, vector<double> &maps_y, 
     vector<double> const &prev_path_x, vector<double> const &prev_path_y, 
@@ -19,7 +19,6 @@ void generateSingleTrajectory(
 
   trajectory_x.clear();
   trajectory_y.clear();
-
   // if has previous trajectory, preserve the first few points
   // then generate new trajectory from the last point
   vector<double> target_x, target_y, target_t;
@@ -83,81 +82,46 @@ void generateSingleTrajectory(
   for (double t=0.0; t<target_time; t+=0.02) {
     curr_p = transformFromEgo(start_x,start_y,start_theta,sx(t),sy(t));
     trajectory_x.push_back(curr_p[0]);
-    trajectory_y.push_back(curr_p[1]);
+    trajectory_y.push_back(curr_p[1]); 
   }
 }
 
-bool detectCollision(vector<vector<double>> const &obstacle_x, vector<vector<double>> const &obstacle_y,
-    vector<double> const &trajectory_x, vector<double> const &trajectory_y, double time_limit, double tolerance=4) {
-  int idx_t=0, idx_c=0;
-  // std::cout << "obstacle size " << obstacle_x[0].size() << " traj size " << trajectory_x.size() << std::endl;
-  // std::cout << "next point " << trajectory_x[0] << " " << trajectory_y[0] << std::endl;
-  while (idx_t<trajectory_x.size() && idx_c<obstacle_x.size()) {
-    double curr_x=trajectory_x[idx_t], curr_y=trajectory_y[idx_t];
-    for (int i=0; i<obstacle_x[idx_c].size(); i++) {
-      // std::cout << distance(curr_x,curr_y,obstacle_x[idx_c][i],obstacle_y[idx_c][i]) << std::endl;
-      if (distance(curr_x,curr_y,obstacle_x[idx_c][i],obstacle_y[idx_c][i])<tolerance) {
-        return true;
+int scoreProposal(double car_s, double car_d, double car_speed,
+    double track_len, int target_lane, bool check_behind,
+    vector<vector<double>> const &sensor_fusion) {
+  double s_ahead, v_ahead, s_behind;
+  v_ahead = 21.5;
+  s_ahead = 1e8;
+  s_behind = 1e8;
+  for (int i=0; i<sensor_fusion.size(); i++) {
+    if (isInLane(sensor_fusion[i][6], target_lane)) {
+      double s=sensor_fusion[i][5];
+
+      double ahead_dist=(s-car_s>=0)?(s-car_s):(s+track_len-car_s);
+      if (ahead_dist<100 && ahead_dist<s_ahead) {
+        s_ahead = ahead_dist;
+        v_ahead = distance(sensor_fusion[i][3],sensor_fusion[i][4],0.0,0.0);
       }
-    }
-    idx_t += 10;
-    idx_c += 1;
-  }
-  return false;
-}
-
-void generateObstacle(vector<vector<double>> const &sensor_fusion, double time_limit, 
-    vector<vector<double>> &obstacle_x, vector<vector<double>> &obstacle_y) {
-  for (int i=0; i<int(time_limit/0.2); i++) {
-    obstacle_x[i].clear();
-    obstacle_y[i].clear();
-  }
-  for (auto itr=sensor_fusion.begin(); itr != sensor_fusion.end(); itr++) {
-    for (int i=0; i<int(time_limit/0.2); i++) {
-      obstacle_x[i].push_back((*itr)[1]+i*0.2*(*itr)[3]);
-      obstacle_y[i].push_back((*itr)[2]+i*0.2*(*itr)[4]);
-      // std::cout << i << " " << (*itr)[1]+i*0.2*(*itr)[3] << " " << (*itr)[2]+i*0.2*(*itr)[4] << std::endl;
-    }
-  }
-}
-
-void generateTrajectory(
-    vector<double> &maps_s,
-    vector<double> &maps_x, vector<double> &maps_y, 
-    vector<double> const &prev_path_x, vector<double> const &prev_path_y, 
-    vector<vector<double>> const &obstacle_x, vector<vector<double>> const &obstacle_y,
-    double start_s, double start_d,
-    double start_x, double start_y, double start_theta, double start_speed,
-    double target_time, double target_speed, 
-    vector<double> &trajectory_x, vector<double> &trajectory_y) {
-
-  // sort the lane_d by distance
-  vector<double> lane_dist(3);
-  lane_dist[0]=2;
-  lane_dist[1]=6;
-  lane_dist[2]=10;
-  for (int i=0; i<2; i++) {
-    for (int j=i+1; j<3; j++) {
-      if (fabs(lane_dist[i]-start_d) > fabs(lane_dist[j]-start_d)) {
-        double tmp = lane_dist[i];
-        lane_dist[i] = lane_dist[j];
-        lane_dist[j] = tmp;
+      double behind_dist=(car_s-s>=0)?(car_s-s):(car_s+track_len-s);
+      if (behind_dist<s_behind) {
+        s_behind = behind_dist;
       }
     }
   }
-  //std::cout <<start_d << " " << lane_dist[0] << " " << lane_dist[1] << std::endl;
-  while (1) {
-    for (int i=0; i<3; i++) {
-      std::cout << lane_dist[i] << " " << target_speed << std::endl;
-      generateSingleTrajectory(maps_s, maps_x, maps_y, prev_path_x, prev_path_y,
-          start_s, start_d, start_x, start_y, start_theta, start_speed,
-          target_time, target_speed, lane_dist[i],
-          trajectory_x, trajectory_y);
-      if (!detectCollision(obstacle_x,obstacle_y,trajectory_x,trajectory_y, 3.0)) {
-        return;
-      }
-    }
-    target_speed *= 0.9;
+  // -2 means reject, 2 means can accelerate, 1 means maintain speed, 0 and -1 means decc
+  if (check_behind && s_behind<20) {
+    return -2;
+  }
+  if (s_ahead >= 100 || v_ahead >= car_speed) {
+    return 2;
+  }
+  if (s_ahead >= 70) {
+    return 1;
+  }
+  if (s_ahead >= 50) {
+    return 0;
+  } else {
+    return -1;
   }
 }
 

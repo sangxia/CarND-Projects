@@ -19,12 +19,48 @@ vector<double> transformToEgo(double vx, double vy, double vtheta,
   return {x*cos(vtheta)+y*sin(vtheta), -x*sin(vtheta)+y*cos(vtheta)};
 }
 
+// lane id is 0 indexed
+bool isInLane(double d, int laneId, int strict=1) {
+  double laneCenter = 2.0 + 4.0*laneId;
+  double margin = 2.0 + (strict==0);
+  return (d >= laneCenter-margin && d <= laneCenter+margin);
+}
+
 vector<double> transformFromEgo(double vx, double vy, double vtheta,
     double px, double py) {
   double x = px*cos(vtheta)-py*sin(vtheta);
   double y = px*sin(vtheta)+py*cos(vtheta);
   return {vx+x, vy+y};
 }
+
+/*
+double getNewSpeed(double curr_speed, double target_speed, double t) {
+  const double acc = 1.1;
+  if (curr_speed < target_speed) {
+    return min(target_speed,curr_speed+t*acc);
+  } else if (curr_speed > target_speed) {
+    return max(target_speed,curr_speed-t*acc);
+  } else {
+    return curr_speed;
+  }
+}
+
+double travelTime(double curr_speed, double target_speed, double dist) {
+  // note that the target speed cannot be 0
+  const double acc = 1.1;
+  double acc_time = fabs(curr_speed-target_speed) / acc;
+  double acc_dist = 0.5*acc_time*(curr_speed+target_speed);
+  if (dist >= acc_dist) {
+    return acc_time + (dist-acc_dist)/target_speed;
+  } else {
+    if (curr_speed < target_speed) {
+      return (sqrt(curr_speed*curr_speed+2*dist)-curr_speed)/acc;
+    } else {
+      return (curr_speed - sqrt(curr_speed*curr_speed-2*dist))/acc;
+    }
+  }
+}
+*/
 
 double normalizeAngle(double r) {
   double result = r;
