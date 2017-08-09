@@ -129,7 +129,7 @@ int main() {
 
           	json msgJson;
             
-            if (previous_path_x.size() > 180) {
+            if (previous_path_x.size() > 100) {
               msgJson["next_x"] = previous_path_x;
               msgJson["next_y"] = previous_path_y;
             } else {

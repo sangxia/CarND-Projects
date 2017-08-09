@@ -30,17 +30,23 @@ void generateTrajectory(
   double curr_y = start_y;
   double dist = 0.0;
   int prev_lim = 20;
+  double curr_time = 0.0;
   if (prev_path_x.size() > 0) {
     for (int i=0; i<prev_lim; i++) {
       curr_p = transformToEgo(start_x,start_y,start_theta,
           prev_path_x[i], prev_path_y[i]);
       tmp_dist += distance(prev_path_x[i], prev_path_y[i], curr_x, curr_y);
+      if (i==0) {
+        curr_time += tmp_dist / start_speed;
+      } else {
+        curr_time += 0.02;
+      }
       // ignore points that are too close, so that latency does not
       // cause the generated trajectory to go backwards
       if (target_speed*1e-2 < tmp_dist) {
         target_x.push_back(curr_p[0]);
         target_y.push_back(curr_p[1]);
-        target_t.push_back(tmp_dist/target_speed);
+        target_t.push_back(curr_time);
       }
       curr_x = prev_path_x[i];
       curr_y = prev_path_y[i];
@@ -66,7 +72,8 @@ void generateTrajectory(
     target_x.push_back(curr_p[0]);
     target_y.push_back(curr_p[1]);
     tmp_dist += dst;
-    target_t.push_back(tmp_dist/target_speed);
+    curr_time += dst/target_speed;
+    target_t.push_back(curr_time);
     curr_x = p[0];
     curr_y = p[1];
     if (wp < maps_s.size()-1) {
@@ -79,11 +86,16 @@ void generateTrajectory(
   sx.set_points(target_t, target_x);
   tk::spline sy;
   sy.set_points(target_t, target_y);
-  for (double t=0.0; t<target_time; t+=0.02) {
+  //std::cout << start_x << " " << start_y << std::endl;
+  for (double t=target_t[0]; t<target_time; t+=0.02) {
     curr_p = transformFromEgo(start_x,start_y,start_theta,sx(t),sy(t));
+    //if (t < 0.4) {
+    //  std::cout << curr_p[0] << " " << curr_p[1] << std::endl;
+    //}
     trajectory_x.push_back(curr_p[0]);
     trajectory_y.push_back(curr_p[1]); 
   }
+  //std::cout << std::endl;
 }
 
 int scoreProposal(double car_s, double car_d, double car_speed,
