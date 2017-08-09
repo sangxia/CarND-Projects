@@ -12,6 +12,20 @@ constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
 double rad2deg(double x) { return x * 180 / pi(); }
 
+vector<double> transformToEgo(double vx, double vy, double vtheta, 
+    double px, double py) {
+  double x = px-vx;
+  double y = py-vy;
+  return {x*cos(vtheta)+y*sin(vtheta), -x*sin(vtheta)+y*cos(vtheta)};
+}
+
+vector<double> transformFromEgo(double vx, double vy, double vtheta,
+    double px, double py) {
+  double x = px*cos(vtheta)-py*sin(vtheta);
+  double y = px*sin(vtheta)+py*cos(vtheta);
+  return {vx+x, vy+y};
+}
+
 double normalizeAngle(double r) {
   double result = r;
   while (r > pi()) { r -= 2*pi(); }
@@ -47,10 +61,10 @@ int NextWaypoint(double x, double y, double theta, vector<double> &maps_x, vecto
 	double map_x = maps_x[closestWaypoint];
 	double map_y = maps_y[closestWaypoint];
 	double heading = atan2( (map_y-y),(map_x-x) );
-	double angle = abs(theta-heading);
+	double angle = fabs(theta-heading);
   if (angle > pi()) {
     // i think not including this is a bug in the official template
-    angle = abs(2*pi()-angle);
+    angle = fabs(2*pi()-angle);
   }
 	if(angle > pi()/2) {
     // std::cout << '+' << closestWaypoint << " " << heading << " " << theta << std::endl;
@@ -115,11 +129,9 @@ vector<double> getXY(double s, double d, vector<double> &maps_s, vector<double> 
   int map_size = maps_s.size();
 	int prev_wp = -1;
   if (s < 1e-5) {
-    std::cout << "b1" << std::endl;
     s = maps_s[map_size-1] + distance(maps_x[map_size-1],maps_y[map_size-1],maps_x[0],maps_y[0]) + s;
     prev_wp = map_size-1;
   } else {
-    std::cout << "b2" << std::endl;
     while(s > maps_s[prev_wp+1] && (prev_wp < (int)(maps_s.size()-1) )) {
       prev_wp++;
     }

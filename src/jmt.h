@@ -77,7 +77,7 @@ void generateTrajectory(
 
   double start_speed_x = start_speed*cos(start_theta);
   double start_speed_y = start_speed*sin(start_theta);
-  std::cout << "start " << start_x << " " << start_y << " " << start_speed_x << " " << start_speed_y << " " << start_theta << std::endl;
+  //std::cout << "start " << start_x << " " << start_y << " " << start_speed_x << " " << start_speed_y << " " << start_theta << std::endl;
 
   int curr_d = 6.0; // TODO make this adaptive
 
@@ -88,8 +88,10 @@ void generateTrajectory(
   double curr_y = start_y;
   double curr_yaw = start_theta;
   double tmp_dist = 0.0;
+  double acc_x = 0.0;
+  double acc_y = 0.0;
   if (prev_path_x.size() > 0) {
-    int lim = 10;
+    int lim = 20;
     for (int i=0; i<lim-1; i++) {
       trajectory_x.push_back(prev_path_x[i]);
       trajectory_y.push_back(prev_path_y[i]);
@@ -106,6 +108,8 @@ void generateTrajectory(
     double last_speed = distance(prev_path_x[lim-2],prev_path_y[lim-2],prev_path_x[lim-1],prev_path_y[lim-1])/0.02;
     start_speed_x = last_speed*cos(curr_yaw);
     start_speed_y = last_speed*sin(curr_yaw);
+    acc_x = ((prev_path_x[lim-1]-prev_path_x[lim-2])-(prev_path_x[lim-2]-prev_path_x[lim-3]))/(0.02*0.02);
+    acc_y = ((prev_path_y[lim-1]-prev_path_y[lim-2])-(prev_path_y[lim-2]-prev_path_y[lim-3]))/(0.02*0.02);
   } else {
     target_x.push_back(curr_x);
     target_y.push_back(curr_y);
@@ -115,7 +119,7 @@ void generateTrajectory(
 
   // collect the next few waypoints until distance target is filled
   int wp = NextWaypoint(curr_x, curr_y, start_theta, maps_x, maps_y);
-  std::cout << "next wp id " << wp << std::endl;
+  //std::cout << "next wp id " << wp << std::endl;
   while (tmp_dist < target_time*target_speed) {
     std::cout << "next wp id " << wp << " s " << maps_s[wp] << std::endl;
     vector<double> p = getXY(maps_s[wp], curr_d, maps_s, maps_x, maps_y);
@@ -159,10 +163,10 @@ void generateTrajectory(
   int tp = 0;
   double x=target_x[0]; 
   double dx=start_speed_x; 
-  double ddx = 0.0;
+  double ddx = 0.0; //acc_x;
   double y=target_y[0]; 
   double dy=start_speed_y; 
-  double ddy = 0.0;
+  double ddy = 0.0; //acc_y;
   if (start_speed > 1e-2) { 
     curr_yaw = atan2(dy,dx);
   } else {
@@ -174,7 +178,7 @@ void generateTrajectory(
   while (ts < target_time) {
     if (ts >= target_t[tp]) {
       ts_shift = ts - target_t[tp];
-      std::cout << "ts " << ts << " " << target_t[tp] << std::endl;
+      //std::cout << "ts " << ts << " " << target_t[tp] << std::endl;
       tp++;
       nxt_yaw = target_yaw[tp];
       /*
@@ -194,9 +198,10 @@ void generateTrajectory(
       double ty=target_y[tp];
       double dty=target_speed*sin(nxt_yaw);
       double ddty = 0.0;
-      std::cout << " gen " << tp << " " << x << " " << dx << " " << y << " " << dy << " " << tx << " " << dtx << " " << ty << " " << dty << std::endl;
+      //std::cout << " gen " << tp << " " << x << " " << dx << " " << y << " " << dy << " " << tx << " " << dtx << " " << ty << " " << dty << std::endl;
       px = JMT(x,dx,ddx,tx,dtx,ddtx,target_t[tp]-ts);
       py = JMT(y,dy,ddy,ty,dty,ddty,target_t[tp]-ts);
+      /*
       std::cout << "---" << std::endl;
       for (int i=0; i<px.size(); i++) {
         std::cout << "," << px[i];
@@ -207,6 +212,7 @@ void generateTrajectory(
       }
       std::cout << std::endl;
       std::cout << "---" << std::endl;
+      */
       x=tx;
       dx=dtx;
       ddx=ddtx;

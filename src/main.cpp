@@ -10,8 +10,8 @@
 #include "json.hpp"
 
 #include "road_geometry.h"
-//#include "spline.h"
-#include "jmt.h"
+#include "spline_trajectory.h"
+//#include "jmt.h"
 
 using namespace std;
 using Eigen::MatrixXd;
@@ -135,7 +135,7 @@ int main() {
               vector<double> next_x_vals;
               vector<double> next_y_vals;
               generateTrajectory(map_waypoints_s, map_waypoints_x, map_waypoints_y, map_waypoints_dx, map_waypoints_dy, previous_path_x, previous_path_y,
-                  car_s, car_d, car_x, car_y, car_yaw, car_speed, 4, 15, next_x_vals, next_y_vals);
+                  car_s, car_d, car_x, car_y, car_yaw, car_speed, 4, 16, next_x_vals, next_y_vals);
               msgJson["next_x"] = next_x_vals;
               msgJson["next_y"] = next_y_vals;
             }
