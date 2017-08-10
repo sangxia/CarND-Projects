@@ -115,7 +115,7 @@ int NextWaypoint(double x, double y, double theta, vector<double> &maps_x, vecto
     angle = fabs(2*pi()-angle);
   }
   // std::cout << '+' << closestWaypoint << " " << heading << " " << theta << " " << angle << std::endl;
-	if(angle > pi()/2) {
+	if(angle > pi()/4) {
     // bug fix
 		closestWaypoint = (closestWaypoint+1) % maps_x.size();
 	}

@@ -120,7 +120,7 @@ int main() {
             }
 
             // plan this much ahead
-            const double time_limit = 4.0;
+            const double time_limit = 5.0;
             const double max_speed = 20.5;
 
           	// Previous path data given to the Planner
@@ -135,7 +135,7 @@ int main() {
             
           	json msgJson;
             
-            if (previous_path_x.size() > 100 || (changing_lane && previous_path_x.size() > 30)) {
+            if (previous_path_x.size() > 80 || (changing_lane && previous_path_x.size() > 30)) {
               msgJson["next_x"] = previous_path_x;
               msgJson["next_y"] = previous_path_y;
             } else {
@@ -174,7 +174,7 @@ int main() {
               double current_lane_speed = best_target_lane_speed;
 
               // only consider lane change if not in the middle of it and have not done so for a while and no sharp curve
-              if (!changing_lane && current_time - last_lane_change > 10.0 && dp>0.995 && last_dp>0.995) {
+              if (!changing_lane && current_time - last_lane_change > 3.0 && dp>0.996 && last_dp>0.996) {
                 std::cout << "since last change " << current_time-last_lane_change << std::endl;
                 if (current_lane > 0) {
                   tmp_score = scoreProposal(car_s,car_d,car_speed,track_len,current_lane-1,true,sensor_fusion,tmp_target_lane_speed);
@@ -202,7 +202,7 @@ int main() {
                   if (tmp_score>=0 && tmp_target_lane_speed>best_target_lane_speed && tmp_target_lane_speed>current_lane_speed+1) {
                     best_score = tmp_score;
                     tmp_score = scoreProposal(car_s,car_d,car_speed,track_len,1,true,sensor_fusion,tmp_target_lane_speed);
-                    if (tmp_score > -2) {
+                    if (tmp_score >= 0) {
                       best_target_lane_speed = tmp_target_lane_speed;
                       best_lane = 1;
                       target_lane = best_lane;
@@ -216,7 +216,7 @@ int main() {
                   if (tmp_score>=0 && tmp_target_lane_speed>best_target_lane_speed && tmp_target_lane_speed>current_lane_speed+1) {
                     best_score = tmp_score;
                     tmp_score = scoreProposal(car_s,car_d,car_speed,track_len,1,true,sensor_fusion,tmp_target_lane_speed);
-                    if (tmp_score > -2) {
+                    if (tmp_score >= 0) {
                       best_target_lane_speed = tmp_target_lane_speed;
                       best_lane = 1;
                       target_lane = best_lane;

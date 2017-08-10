@@ -73,6 +73,7 @@ void generateTrajectory(
   int wp = NextWaypoint(curr_x, curr_y, start_theta, maps_x, maps_y);
   vector<double> p;
   bool lane_changed = false; // decide which d to use when putting down trj. waypoints
+  bool no_wait = change_lane && (fabs(prev_d-getLaneCenterByD(prev_d))>1.0);
   while (target_x.size() < min_target_size || tmp_dist < target_time*target_speed) {
     if (lane_changed) {
       p = getXY(maps_s[wp], getLaneCenterByD(target_d), maps_s, maps_x, maps_y);
@@ -84,7 +85,7 @@ void generateTrajectory(
       p = getXY(maps_s[wp], getLaneCenterByD(start_d), maps_s, maps_x, maps_y);
     }
     double dst = distance(p[0], p[1], curr_x, curr_y);
-    if (change_lane && (!lane_changed) && (dst>25)) {
+    if (change_lane && (!lane_changed) && (dst>25 || no_wait)) {
       // only switch d if there has been enough distance
       p = getXY(maps_s[wp], getLaneCenterByD(target_d), maps_s, maps_x, maps_y);
       dst = distance(p[0], p[1], curr_x, curr_y);
