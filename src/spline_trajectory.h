@@ -120,13 +120,13 @@ void generateTrajectory(
 int scoreProposal(double car_s, double car_d, double car_speed,
     double track_len, int target_lane, bool check_behind,
     vector<vector<double>> const &sensor_fusion, double &proposed_speed) {
-  double s_ahead, v_ahead, s_behind;
+  double s_ahead, v_ahead, s_behind, v_behind;
   v_ahead = 21.5;
   s_ahead = 1e8;
-  v_behind = 21.5;
+  v_behind = 0.0;
   s_behind = 1e8;
   for (int i=0; i<sensor_fusion.size(); i++) {
-    if (isInLane(sensor_fusion[i][6], target_lane)) {
+    if (isInLane(sensor_fusion[i][6], target_lane, 0)) {
       double s=sensor_fusion[i][5];
 
       double ahead_dist=(s-car_s>=0)?(s-car_s):(s+track_len-car_s);
@@ -137,14 +137,17 @@ int scoreProposal(double car_s, double car_d, double car_speed,
       double behind_dist=(car_s-s>=0)?(car_s-s):(car_s+track_len-s);
       if (behind_dist<s_behind) {
         s_behind = behind_dist;
+        v_behind = distance(sensor_fusion[i][3],sensor_fusion[i][4],0.0,0.0);
       }
     }
   }
   // -2 means reject, 2 means can accelerate, 1 means maintain speed, 0 and -1 means decc
-  std::cout << "lane " << target_lane << " s ahead " << s_ahead 
-    << " s behind " << s_behind << std::endl;
+  std::cout << "lane " << target_lane 
+    << " s ahead " << s_ahead << " v ahead " << v_ahead
+    << " s behind " << s_behind << " v behind " << v_behind << std::endl;
   proposed_speed = v_ahead;
-  if (check_behind && s_behind<40) {
+  if (check_behind && (v_behind-car_speed)*3.0>s_behind-10) {
+    // make sure we have space of 3 seconds
     return -2;
   }
   if (s_ahead >= 100 || (v_ahead >= car_speed && s_ahead>=50)) {

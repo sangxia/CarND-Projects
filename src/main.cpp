@@ -36,7 +36,7 @@ string hasData(string s) {
 }
 
 double get_current_time() {
-  return std::chrono::duration_cast<std::chrono::microseconds>(
+  return std::chrono::duration_cast<std::chrono::seconds>(
       std::chrono::high_resolution_clock().now().time_since_epoch()).count();
 }
 
@@ -84,10 +84,11 @@ int main() {
   double target_speed = 0.0; 
   bool changing_lane = false;
   double last_lane_change = 0.0;
+  double last_dp = 1.0;
   int current_lane = -1, target_lane = 1;
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy,&track_len,map_waypoints_size,
-      &target_speed, &changing_lane, &last_lane_change, &current_lane, &target_lane](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+      &target_speed, &changing_lane, &last_lane_change, &current_lane, &target_lane, &last_dp](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -132,7 +133,7 @@ int main() {
             
           	json msgJson;
             
-            if (previous_path_x.size() > 100) {
+            if (previous_path_x.size() > 100 || (changing_lane && previous_path_x.size() > 30)) {
               msgJson["next_x"] = previous_path_x;
               msgJson["next_y"] = previous_path_y;
             } else {
@@ -171,7 +172,8 @@ int main() {
               double current_lane_speed = best_target_lane_speed;
 
               // only consider lane change if not in the middle of it and have not done so for a while and no sharp curve
-              if (!changing_lane && current_time - last_lane_change > 10.0 && dp>0.992) {
+              if (!changing_lane && current_time - last_lane_change > 10.0 && dp>0.992 && last_dp>0.992) {
+                std::cout << "since last change " << current_time-last_lane_change << std::endl;
                 if (current_lane > 0) {
                   tmp_score = scoreProposal(car_s,car_d,car_speed,track_len,current_lane-1,true,sensor_fusion,tmp_target_lane_speed);
                   if (tmp_score>=0 && tmp_target_lane_speed>best_target_lane_speed && tmp_target_lane_speed>current_lane_speed+1) {
@@ -193,18 +195,18 @@ int main() {
                   }
                 }
               } else {
-                std::cout << "not considering lane change because " << changing_lane << " " << current_time << " " << last_lane_change << std::endl;
+                std::cout << "not considering lane change because: " << "changing " << changing_lane 
+                  << " since last change " << current_time-last_lane_change 
+                  << " curve0 " << last_dp << " curve1 " << dp << std::endl;
               }
 
               if (best_score == 2) {
                 target_speed = min(21.0, car_speed+1.0+0.8*(car_speed<5));
               } else if (best_score == 0) {
                 target_speed = max(car_speed-0.8, 4.0);
-              } else if (best_score == -1) {
-                target_speed = max(car_speed-1.2, 4.0);
-              } else if (best_score == -2) {
-                target_speed = max(car_speed-2.5, 4.0);
-              }
+              } else { //if (best_score == -1) {
+                target_speed = max(car_speed-1.5, 4.0);
+              } 
 
               std::cout << "car speed " << car_speed << " target speed " << target_speed << std::endl;
               std::cout << "current lane " << current_lane << " target lane " << target_lane << std::endl;
@@ -216,6 +218,7 @@ int main() {
                 generateTrajectory(map_waypoints_s, map_waypoints_x, map_waypoints_y, previous_path_x, previous_path_y,
                     car_s, car_d, car_x, car_y, car_yaw, car_speed, 4, target_speed, getLaneCenterById(current_lane), false, next_x_vals, next_y_vals);
               }
+              last_dp = dp;
 
               /*
               if (car_speed<15) {
