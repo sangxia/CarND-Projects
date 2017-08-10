@@ -26,11 +26,10 @@ void generateTrajectory(
   vector<double> curr_p;
   curr_p.push_back(0.0);
   curr_p.push_back(0.0);
-  double tmp_dist = 0.0;
+  double tmp_dist = 0.0; // accumulate trj. dist. to estimate time & know when to stop
   double curr_x = start_x;
   double curr_y = start_y;
-  double dist = 0.0;
-  int prev_lim = 20;
+  int prev_lim = min(30, int(prev_path_x.size())); // number of points to keep from previous trajectory
   double curr_time = 0.0;
   double prev_d = start_d;
   if (prev_path_x.size() > 0) {
@@ -53,9 +52,13 @@ void generateTrajectory(
       curr_x = prev_path_x[i];
       curr_y = prev_path_y[i];
     }
+    // this is useful if regenerating in the middle of lane change
+    // perhaps not necessary for the current approach
+    // std::cout << "prev_yaw " << atan2(prev_path_y[prev_lim-1]-prev_path_y[prev_lim-2],
+    //       prev_path_x[prev_lim-1]-prev_path_x[prev_lim-2]) << std::endl;
     vector<double> tmp = getFrenet(curr_x,curr_y,
         atan2(prev_path_y[prev_lim-1]-prev_path_y[prev_lim-2],
-          prev_path_x[prev_lim-1]-prev_path_x[prev_lim-1]),
+          prev_path_x[prev_lim-1]-prev_path_x[prev_lim-2]),
         maps_x, maps_y);
     prev_d = tmp[1];
   } else {
@@ -69,20 +72,20 @@ void generateTrajectory(
   // collect the next few waypoints until distance target is filled
   int wp = NextWaypoint(curr_x, curr_y, start_theta, maps_x, maps_y);
   vector<double> p;
-  bool lane_changed = false;
-  //std::cout << "next wp id " << wp << std::endl;
-  while (target_x.size() < min_target_size || 
-      tmp_dist < target_time*target_speed) {
-    //std::cout << "next wp id " << wp << " s " << maps_s[wp] << std::endl;
+  bool lane_changed = false; // decide which d to use when putting down trj. waypoints
+  while (target_x.size() < min_target_size || tmp_dist < target_time*target_speed) {
     if (lane_changed) {
       p = getXY(maps_s[wp], getLaneCenterByD(target_d), maps_s, maps_x, maps_y);
     } else if (change_lane) {
+      // the calculation of this part is not finished yet, see below
+      std::cout << prev_d << std::endl;
       p = getXY(maps_s[wp], prev_d, maps_s, maps_x, maps_y);
     } else {
       p = getXY(maps_s[wp], getLaneCenterByD(start_d), maps_s, maps_x, maps_y);
     }
     double dst = distance(p[0], p[1], curr_x, curr_y);
-    if (change_lane && (!lane_changed) && (dst>20)) {
+    if (change_lane && (!lane_changed) && (dst>25)) {
+      // only switch d if there has been enough distance
       p = getXY(maps_s[wp], getLaneCenterByD(target_d), maps_s, maps_x, maps_y);
       dst = distance(p[0], p[1], curr_x, curr_y);
       lane_changed = true;
@@ -105,12 +108,9 @@ void generateTrajectory(
   sx.set_points(target_t, target_x);
   tk::spline sy;
   sy.set_points(target_t, target_y);
-  //std::cout << start_x << " " << start_y << std::endl;
   for (double t=target_t[0]; t<target_time; t+=0.02) {
+    // start from the end of the previous trajectory
     curr_p = transformFromEgo(start_x,start_y,start_theta,sx(t),sy(t));
-    //if (t < 0.4) {
-    //  std::cout << curr_p[0] << " " << curr_p[1] << std::endl;
-    //}
     trajectory_x.push_back(curr_p[0]);
     trajectory_y.push_back(curr_p[1]); 
   }

@@ -19,10 +19,17 @@ vector<double> transformToEgo(double vx, double vy, double vtheta,
   return {x*cos(vtheta)+y*sin(vtheta), -x*sin(vtheta)+y*cos(vtheta)};
 }
 
+vector<double> transformFromEgo(double vx, double vy, double vtheta,
+    double px, double py) {
+  double x = px*cos(vtheta)-py*sin(vtheta);
+  double y = px*sin(vtheta)+py*cos(vtheta);
+  return {vx+x, vy+y};
+}
+
 // lane id is 0 indexed
 bool isInLane(double d, int laneId, int strict=1) {
   double laneCenter = 2.0 + 4.0*laneId;
-  double margin = 2.0 + (strict==0);
+  double margin = 2.0 + (strict==0)*0.5;
   return (d >= laneCenter-margin && d <= laneCenter+margin);
 }
 
@@ -37,30 +44,27 @@ int getLane(double d) {
 }
 
 double getLaneCenterById(int laneId) {
+  // allow some slack in the left and right lane so that
+  // the car doesn't go off road in rare situations
   if (laneId==0) {
-    return 2.4;
+    return 2.45;
   } else if (laneId==1) {
     return 6.0;
   } else {
-    return 9.6;
+    return 9.55;
   }
 }
 
 double getLaneCenterByD(double d) {
+  // allow some slack in the left and right lane so that
+  // the car doesn't go off road in rare situations
   if (d < 4) {
-    return 2.4;
+    return 2.45;
   } else if (d < 8) {
     return 6.0; 
   } else {
-    return 9.6;
+    return 9.55;
   }
-}
-
-vector<double> transformFromEgo(double vx, double vy, double vtheta,
-    double px, double py) {
-  double x = px*cos(vtheta)-py*sin(vtheta);
-  double y = px*sin(vtheta)+py*cos(vtheta);
-  return {vx+x, vy+y};
 }
 
 double normalizeAngle(double r) {
@@ -110,24 +114,12 @@ int NextWaypoint(double x, double y, double theta, vector<double> &maps_x, vecto
     // i think not including this is a bug in the official template
     angle = fabs(2*pi()-angle);
   }
+  // std::cout << '+' << closestWaypoint << " " << heading << " " << theta << " " << angle << std::endl;
 	if(angle > pi()/2) {
-    // std::cout << '+' << closestWaypoint << " " << heading << " " << theta << std::endl;
     // bug fix
 		closestWaypoint = (closestWaypoint+1) % maps_x.size();
 	}
 	return closestWaypoint;
-}
-
-int NextWaypoint(double s, vector<double> &maps_s) {
-  // TODO deduct total length
-  if (s >= maps_s[maps_s.size()-1]) {
-    return 0;
-  }
-  int ret = 0;
-  while (s >= maps_s[ret]) {
-    ret++;
-  }
-  return ret;
 }
 
 // Transform from Cartesian x,y coordinates to Frenet s,d coordinates
@@ -192,6 +184,7 @@ vector<double> getXY(double s, double d, vector<double> &maps_s, vector<double> 
 	return {x,y};
 }
 
+/*
 // Transform from Cartesian x,y coordinates to Frenet s,d coordinates
 vector<double> getFrenetWithSpeed(double x, double y, double theta, double speed,
     vector<double> &maps_x, vector<double> &maps_y) {
@@ -249,6 +242,7 @@ vector<double> getFrenetWithXYSpeed(double x, double y, double speed_x, double s
   double theta = atan2(speed_y, speed_x);
   return getFrenetWithSpeed(x, y, theta, speed, maps_x, maps_y);
 }
+*/
 
 #endif
 
