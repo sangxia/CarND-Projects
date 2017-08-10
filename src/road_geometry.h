@@ -26,41 +26,42 @@ bool isInLane(double d, int laneId, int strict=1) {
   return (d >= laneCenter-margin && d <= laneCenter+margin);
 }
 
+int getLane(double d) {
+  if (d < 4) {
+    return 0;
+  } else if (d < 8) {
+    return 1;
+  } else {
+    return 2;
+  }
+}
+
+double getLaneCenterById(int laneId) {
+  if (laneId==0) {
+    return 2.4;
+  } else if (laneId==1) {
+    return 6.0;
+  } else {
+    return 9.6;
+  }
+}
+
+double getLaneCenterByD(double d) {
+  if (d < 4) {
+    return 2.4;
+  } else if (d < 8) {
+    return 6.0; 
+  } else {
+    return 9.6;
+  }
+}
+
 vector<double> transformFromEgo(double vx, double vy, double vtheta,
     double px, double py) {
   double x = px*cos(vtheta)-py*sin(vtheta);
   double y = px*sin(vtheta)+py*cos(vtheta);
   return {vx+x, vy+y};
 }
-
-/*
-double getNewSpeed(double curr_speed, double target_speed, double t) {
-  const double acc = 1.1;
-  if (curr_speed < target_speed) {
-    return min(target_speed,curr_speed+t*acc);
-  } else if (curr_speed > target_speed) {
-    return max(target_speed,curr_speed-t*acc);
-  } else {
-    return curr_speed;
-  }
-}
-
-double travelTime(double curr_speed, double target_speed, double dist) {
-  // note that the target speed cannot be 0
-  const double acc = 1.1;
-  double acc_time = fabs(curr_speed-target_speed) / acc;
-  double acc_dist = 0.5*acc_time*(curr_speed+target_speed);
-  if (dist >= acc_dist) {
-    return acc_time + (dist-acc_dist)/target_speed;
-  } else {
-    if (curr_speed < target_speed) {
-      return (sqrt(curr_speed*curr_speed+2*dist)-curr_speed)/acc;
-    } else {
-      return (curr_speed - sqrt(curr_speed*curr_speed-2*dist))/acc;
-    }
-  }
-}
-*/
 
 double normalizeAngle(double r) {
   double result = r;
@@ -75,6 +76,13 @@ double angleDiff(double r1, double r2) {
 
 double distance(double x1, double y1, double x2, double y2) {
 	return sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
+}
+
+double dotproduct(double x0, double y0, double x1, double y1, 
+    double x2, double y2) {
+  double vx1 = x1-x0, vy1 = y1-y0;
+  double vx2 = x2-x1, vy2 = y2-y1;
+  return (vx1*vx2+vy1*vy2) / (distance(x0,y0,x1,y1)*distance(x2,y2,x1,y1));
 }
 
 int ClosestWaypoint(double x, double y, vector<double> &maps_x, vector<double> &maps_y) {

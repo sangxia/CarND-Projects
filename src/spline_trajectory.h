@@ -14,9 +14,10 @@ void generateTrajectory(
     vector<double> const &prev_path_x, vector<double> const &prev_path_y, 
     double start_s, double start_d,
     double start_x, double start_y, double start_theta, double start_speed,
-    double target_time, double target_speed, double target_d,
+    double target_time, double target_speed, double target_d, bool change_lane,
     vector<double> &trajectory_x, vector<double> &trajectory_y) {
 
+  std::cout << "start_d " << start_d << " target_d " << target_d << std::endl;
   trajectory_x.clear();
   trajectory_y.clear();
   // if has previous trajectory, preserve the first few points
@@ -31,6 +32,7 @@ void generateTrajectory(
   double dist = 0.0;
   int prev_lim = 20;
   double curr_time = 0.0;
+  double prev_d = start_d;
   if (prev_path_x.size() > 0) {
     for (int i=0; i<prev_lim; i++) {
       curr_p = transformToEgo(start_x,start_y,start_theta,
@@ -51,6 +53,11 @@ void generateTrajectory(
       curr_x = prev_path_x[i];
       curr_y = prev_path_y[i];
     }
+    vector<double> tmp = getFrenet(curr_x,curr_y,
+        atan2(prev_path_y[prev_lim-1]-prev_path_y[prev_lim-2],
+          prev_path_x[prev_lim-1]-prev_path_x[prev_lim-1]),
+        maps_x, maps_y);
+    prev_d = tmp[1];
   } else {
     target_x.push_back(curr_p[0]);
     target_y.push_back(curr_p[1]);
@@ -61,13 +68,25 @@ void generateTrajectory(
   int min_target_size = target_x.size() + 2;
   // collect the next few waypoints until distance target is filled
   int wp = NextWaypoint(curr_x, curr_y, start_theta, maps_x, maps_y);
+  vector<double> p;
+  bool lane_changed = false;
   //std::cout << "next wp id " << wp << std::endl;
   while (target_x.size() < min_target_size || 
       tmp_dist < target_time*target_speed) {
     //std::cout << "next wp id " << wp << " s " << maps_s[wp] << std::endl;
-    vector<double> p = getXY(maps_s[wp], target_d, maps_s, maps_x, maps_y);
-    //std::cout << p[0] << " " << p[1] << std::endl;
+    if (lane_changed) {
+      p = getXY(maps_s[wp], getLaneCenterByD(target_d), maps_s, maps_x, maps_y);
+    } else if (change_lane) {
+      p = getXY(maps_s[wp], prev_d, maps_s, maps_x, maps_y);
+    } else {
+      p = getXY(maps_s[wp], getLaneCenterByD(start_d), maps_s, maps_x, maps_y);
+    }
     double dst = distance(p[0], p[1], curr_x, curr_y);
+    if (change_lane && (!lane_changed) && (dst>20)) {
+      p = getXY(maps_s[wp], getLaneCenterByD(target_d), maps_s, maps_x, maps_y);
+      dst = distance(p[0], p[1], curr_x, curr_y);
+      lane_changed = true;
+    } 
     curr_p = transformToEgo(start_x,start_y,start_theta,p[0],p[1]);
     target_x.push_back(curr_p[0]);
     target_y.push_back(curr_p[1]);
@@ -95,15 +114,16 @@ void generateTrajectory(
     trajectory_x.push_back(curr_p[0]);
     trajectory_y.push_back(curr_p[1]); 
   }
-  //std::cout << std::endl;
+  std::cout << std::endl;
 }
 
 int scoreProposal(double car_s, double car_d, double car_speed,
     double track_len, int target_lane, bool check_behind,
-    vector<vector<double>> const &sensor_fusion) {
+    vector<vector<double>> const &sensor_fusion, double &proposed_speed) {
   double s_ahead, v_ahead, s_behind;
   v_ahead = 21.5;
   s_ahead = 1e8;
+  v_behind = 21.5;
   s_behind = 1e8;
   for (int i=0; i<sensor_fusion.size(); i++) {
     if (isInLane(sensor_fusion[i][6], target_lane)) {
@@ -121,10 +141,13 @@ int scoreProposal(double car_s, double car_d, double car_speed,
     }
   }
   // -2 means reject, 2 means can accelerate, 1 means maintain speed, 0 and -1 means decc
-  if (check_behind && s_behind<20) {
+  std::cout << "lane " << target_lane << " s ahead " << s_ahead 
+    << " s behind " << s_behind << std::endl;
+  proposed_speed = v_ahead;
+  if (check_behind && s_behind<40) {
     return -2;
   }
-  if (s_ahead >= 100 || v_ahead >= car_speed) {
+  if (s_ahead >= 100 || (v_ahead >= car_speed && s_ahead>=50)) {
     return 2;
   }
   if (s_ahead >= 70) {
