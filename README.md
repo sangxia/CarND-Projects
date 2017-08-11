@@ -82,6 +82,7 @@ lane change can be completed within 2 seconds.
 
 ## Results and Discussions
 
+Here is [a link to the video recording of my run](https://youtu.be/3gok9qKyr64).
 As one can see in the video, the vehicle safely finished 3 laps. It is also
 able to change lanes when obstructed. 
 
@@ -98,9 +99,11 @@ fairly conservative and avoiding collision *naturally* takes higher
 priority. The other vehicles in the simulator exhibits some pretty bad
 driving behavior, such as lane change at very short distance, not keeping
 enough distance, rapid acceleration and decceleration, etc., some of these
-are probably rather like many human drivers.  This also means
-that in order to implement a more aggressive lane change strategy,
-we would certainly need an extra safety component that runs more 
+are probably rather like many human drivers. One example would be around
+mile 0.53 in the video.
+
+This also means that in order to implement a more aggressive lane change 
+strategy, we would certainly need an extra safety component that runs more 
 frequently than every 5 seconds (the rate the path planner is running at),
 and that intervenes when emergency brakes are needed or lane change must 
 be aborted.
