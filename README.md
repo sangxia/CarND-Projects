@@ -1,134 +1,141 @@
-# CarND-Path-Planning-Project
-Self-Driving Car Engineer Nanodegree Program
+# CarND Path Planning Project
    
-### Simulator. You can download the Term3 Simulator BETA which contains the Path Planning Project from the [releases tab](https://github.com/udacity/self-driving-car-sim/releases).
+The goal of this project is to safely navigate around a virtual highway 
+with other traffic that is driving +/-10 MPH of the 50 MPH speed limit. 
+The path planner gets from the simulator the car's localization and sensor 
+fusion data, and there is also a sparse list of waypoints that can be
+used to calculate the coordinates of points around the highway. 
 
-In this project your goal is to safely navigate around a virtual highway with other traffic that is driving +-10 MPH of the 50 MPH speed limit. You will be provided the car's localization and sensor fusion data, there is also a sparse map list of waypoints around the highway. The car should try to go as close as possible to the 50 MPH speed limit, which means passing slower traffic when possible, note that other cars will try to change lanes too. The car should avoid hitting other cars at all cost as well as driving inside of the marked road lanes at all times, unless going from one lane to another. The car should be able to make one complete loop around the 6946m highway. Since the car is trying to go 50 MPH, it should take a little over 5 minutes to complete 1 loop. Also the car should not experience total acceleration over 10 m/s^2 and jerk that is greater than 50 m/s^3.
+The path planner needs to fulfill the following objectives:
+* The car should stay on the road, and do not spend more than 3 
+seconds driving on more than 1 lane.
+* The car should avoid hitting other cars on the road.
+* In addition to the speed limit, the total acceleration of the car should 
+be less than 10 m/s^2 and the jerk should be less than 50 m/s^3.
+* The target speed of the car is 50 MPH, and when the car is 
+obstructed by slow traffic, it will try to change lanes when possible.
 
-#### The map of the highway is in data/highway_map.txt
-Each waypoint in the list contains  [x,y,s,dx,dy] values. x and y are the waypoint's map coordinate position, the s value is the distance along the road to get to that waypoint in meters, the dx and dy values define the unit normal vector pointing outward of the highway loop.
+The path planner communicates with the simulator to control the car by
+providing a list of points that the car should visit. The car has a perfect
+controller and visits every point provided on the list. There is latency
+in the process, and the simulator provides a list of points provided 
+previously that has not yet been visited along with localization and sensor
+fusion data.
 
-The highway's waypoints loop around so the frenet s value, distance along the road, goes from 0 to 6945.554.
+*A note for running the path planner:* there is a part in `generateTrajectory`
+that outputs fairly detailed trajectory information to `stderr`. 
+Since we are not generating trajectory at very high rates, this should not
+cause latency problems. Otherwise, redirecting `stderr` to `tmpfs` 
+or `/dev/null`, or comment out this section entirely should be sufficient.
 
-## Basic Build Instructions
+## Details of the Path Planner
 
-1. Clone this repo.
-2. Make a build directory: `mkdir build && cd build`
-3. Compile: `cmake .. && make`
-4. Run it: `./path_planning`.
+The path planner I implemented can be divided into two parts: a higher level 
+part that decides on speed and lane change, and a lower level part that 
+generates the trajectory that implements those decisions.
 
-Here is the data provided from the Simulator to the C++ Program
+Overall, the path planner aim to generate trajectories 5 seconds into the 
+future, and regenerates a path about every 3.5 seconds. It is important to
+*not* generate new trajectories too often, as this would lead to worse 
+latency.
 
-#### Main car's localization Data (No Noise)
+### High Level Planning
 
-["x"] The car's x position in map coordinates
+This part is implemented mostly in `main.cpp`. The algorithm keeps track of
+the state of the car, its current lane, whether it is currently changing lanes,
+and if so, which lane it is trying to change into.
 
-["y"] The car's y position in map coordinates
+The algorithm first checks if there are enough points from the previous 
+trajectory that have not been processed. If so, then the same trajectory is
+returned to the simulator. The algorithm allows more time to execute previous
+trajectory if the car is in the middle of a lane change. This setup improves
+stability of the trajectory during lane change.
 
-["s"] The car's s position in frenet coordinates
+If new trajectory is needed, the algorithm then evaluates different options.
+In general, the criteria is to allow lane change if (1) it is safe, and 
+(2) there is a clear advantage (speed difference of at least 1 m/s).
+In addition to changing into the immediate next lane, the algorithm also 
+evaluates if it is beneficial to change two lanes. The different proposals
+are scored by `scoreProposal` in `spline_trajectory.h`. This function
+returns an integer score indicating how good / safe the proposal is, and
+also indicates what the speed might be if the proposal is followed.
+Safety is determined by distance from the nearest vehicle ahead and behind, 
+as well as the relative speed between the vehicles.
+In order to minimize acceleration and jerk, the algorithm avoids lane change
+if either of the following is true:
+* There is a sharp curve ahead.
+* The car changed lane not so long ago.
 
-["d"] The car's d position in frenet coordinates
+### Low Level Trajectory Generation
 
-["yaw"] The car's yaw angle in the map
+After making the high level decision regarding speed and lane, the algorithm
+uses `generateTrajectory` in `spline_trajectory.h` to generate the actual 
+trajectory. To ensure some continuity, the first few points (specified by
+`prev_lim`) are always copied to the new trajectory as long as they are not 
+too close to the current point (this is to lower the probability that the 
+controller sees a path point behind the vehicle due to latency). The future
+trajectory is then decided by fitting a spline through those points along
+with a few waypoints ahead of the vehicle. If there is a decision to change
+lane, or the car is in the middle of a lane change, the `d` value in 
+Frenet coordinate is adjusted accordingly. The setting is such that most
+lane change can be completed within 2 seconds.
 
-["speed"] The car's speed in MPH
+## Results and Discussions
 
-#### Previous path data given to the Planner
+As one can see in the video, the vehicle safely finished 3 laps. It is also
+able to change lanes when obstructed. 
 
-//Note: Return the previous list but with processed points removed, can be a nice tool to show how far along
-the path has processed since last time. 
+There is a period in the video (from about mile 1.6) when the vehicle is
+stuck in the right most lane. Although the left most lane is fairly empty,
+it was not able to change because the middle lane is busy and cars are at
+fairly close distance, and the algorithm decided that it is not safe to 
+change lanes. The situation lasted until around mile 7.2 when the last
+vehicle in the middle lane moved past and the algorithm immediately 
+decided to gradually change into the left lane.
 
-["previous_path_x"] The previous list of x points previously given to the simulator
+The lane change and speed control strategy of my current implementation is
+fairly conservative and avoiding collision *naturally* takes higher 
+priority. The other vehicles in the simulator exhibits some pretty bad
+driving behavior, such as lane change at very short distance, not keeping
+enough distance, rapid acceleration and decceleration, etc., some of these
+are probably rather like many human drivers.  This also means
+that in order to implement a more aggressive lane change strategy,
+we would certainly need an extra safety component that runs more 
+frequently than every 5 seconds (the rate the path planner is running at),
+and that intervenes when emergency brakes are needed or lane change must 
+be aborted.
 
-["previous_path_y"] The previous list of y points previously given to the simulator
+An alternative heuristics for high level planning would be to try to 
+keep the vehicle in the center lane, instead of keeping the vehicle 
+in the current lane as in my current implementation. This would perhaps
+provide some more flexibility when it comes to choosing lanes.
+It may also help with a more sophiscated high level proposal generation
+algorithm. Being able to model the behavior of other vehicles better
+(rather than just comparing relative speed) can also help with this.
+However, this needs to be balanced with latency requirements.
 
-#### Previous path's end s and d values 
+The generated trajectory sometimes wiggles slightly. I think this is 
+mainly due to the fact that the waypoints are sparse, and therefore does 
+not follow the actual road very precisely. It would help if the waypoints 
+are denser. It would also help if waypoints for each lane are provided.
 
-["end_path_s"] The previous list's last point's frenet s value
+Sometimes, such wiggling can lead the vehicle slightly off road for a 
+brief moment if it is driving on the left or right lane, especially
+during lane change. This is currently solved by moving the target lane 
+center of the left and right lane slightly towards the center lane. 
+This is not ideal in certain scenarios, as the vehicle may get too 
+close to vehicles in other lanes. Adding more pathpoints when generating
+the spline will probably give a better control of the generated trajectory.
 
-["end_path_d"] The previous list's last point's frenet d value
+Besides, the current trajectory is generated by fitting two splines, one
+for `x` and one for `y`, separately and both as a function of time.
+Here `x` and `y` are coordinates after transforming to ego coordinate.
+An alternative would be to fit a spline where `y` is a function of `x`, 
+and then generate evenly spaced path points. This might also give a 
+trajectory that wiggles less in certain occasions.
 
-#### Sensor Fusion Data, a list of all other car's attributes on the same side of the road. (No Noise)
-
-["sensor_fusion"] A 2d vector of cars and then that car's [car's unique ID, car's x position in map coordinates, car's y position in map coordinates, car's x velocity in m/s, car's y velocity in m/s, car's s position in frenet coordinates, car's d position in frenet coordinates. 
-
-## Details
-
-1. The car uses a perfect controller and will visit every (x,y) point it recieves in the list every .02 seconds. The units for the (x,y) points are in meters and the spacing of the points determines the speed of the car. The vector going from a point to the next point in the list dictates the angle of the car. Acceleration both in the tangential and normal directions is measured along with the jerk, the rate of change of total Acceleration. The (x,y) point paths that the planner recieves should not have a total acceleration that goes over 10 m/s^2, also the jerk should not go over 50 m/s^3. (NOTE: As this is BETA, these requirements might change. Also currently jerk is over a .02 second interval, it would probably be better to average total acceleration over 1 second and measure jerk from that.
-
-2. There will be some latency between the simulator running and the path planner returning a path, with optimized code usually its not very long maybe just 1-3 time steps. During this delay the simulator will continue using points that it was last given, because of this its a good idea to store the last points you have used so you can have a smooth transition. previous_path_x, and previous_path_y can be helpful for this transition since they show the last points given to the simulator controller with the processed points already removed. You would either return a path that extends this previous path or make sure to create a new path that has a smooth transition with this last path.
-
-## Tips
-
-A really helpful resource for doing this project and creating smooth trajectories was using http://kluge.in-chemnitz.de/opensource/spline/, the spline function is in a single hearder file is really easy to use.
-
----
-
-## Dependencies
-
-* cmake >= 3.5
- * All OSes: [click here for installation instructions](https://cmake.org/install/)
-* make >= 4.1
-  * Linux: make is installed by default on most Linux distros
-  * Mac: [install Xcode command line tools to get make](https://developer.apple.com/xcode/features/)
-  * Windows: [Click here for installation instructions](http://gnuwin32.sourceforge.net/packages/make.htm)
-* gcc/g++ >= 5.4
-  * Linux: gcc / g++ is installed by default on most Linux distros
-  * Mac: same deal as make - [install Xcode command line tools]((https://developer.apple.com/xcode/features/)
-  * Windows: recommend using [MinGW](http://www.mingw.org/)
-* [uWebSockets](https://github.com/uWebSockets/uWebSockets)
-  * Run either `install-mac.sh` or `install-ubuntu.sh`.
-  * If you install from source, checkout to commit `e94b6e1`, i.e.
-    ```
-    git clone https://github.com/uWebSockets/uWebSockets 
-    cd uWebSockets
-    git checkout e94b6e1
-    ```
-
-## Editor Settings
-
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
-
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
-
-## Code Style
-
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
-
-## Project Instructions and Rubric
-
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
-
-
-## Call for IDE Profiles Pull Requests
-
-Help your fellow students!
-
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to ensure
-that students don't feel pressured to use one IDE or another.
-
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
-
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
-
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
-
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
-
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./
+The car currently accelerates rather slowly, especially from cold start.
+This is mostly so that the car doesn't violate the limits on total 
+acceleration and jerk, together with the fact that target speed is not
+updated without new trajectory being generated, that is, every 3.5 
+seconds or so. A more adaptive planner here could be useful.
