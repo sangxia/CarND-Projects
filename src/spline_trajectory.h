@@ -153,20 +153,20 @@ int scoreProposal(double car_s, double car_d, double car_speed,
     << " s ahead " << s_ahead << " v ahead " << v_ahead
     << " s behind " << s_behind << " v behind " << v_behind << std::endl;
   proposed_speed = v_ahead;
-  if (check_behind && (v_behind-car_speed)*3.5>s_behind-10) {
+  if (check_behind && ( s_ahead < 20 || s_behind < 5 || (v_behind-car_speed)*4.0>s_behind-5)) {
     // make sure we have space of 3 seconds
     return -2;
   }
-  if ((car_speed-v_ahead)*3.5 > s_ahead-10) {
+  if ((car_speed-v_ahead)*4.0 > s_ahead-10) {
     return -1;
   }
-  if (s_ahead >= 100 || (v_ahead >= car_speed && s_ahead>=50)) {
+  if (s_ahead >= 100 || (v_ahead >= car_speed && s_ahead>=40)) {
     return 2;
   }
   if (s_ahead >= 70) {
     return 1;
   }
-  if (s_ahead >= 50) {
+  if (s_ahead >= 40) {
     return 0;
   } else {
     return -1;
