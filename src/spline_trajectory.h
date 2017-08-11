@@ -116,6 +116,12 @@ void generateTrajectory(
     trajectory_y.push_back(curr_p[1]); 
   }
   std::cout << std::endl;
+
+  std::cerr << "start point " << start_x << " " << start_y << " speed " << start_speed << std::endl;
+  for (int i=0; i<min(200, int(trajectory_x.size())); i++) {
+    std::cerr << trajectory_x[i] << " " << trajectory_y[i] << std::endl;
+  }
+  std::cerr << std::endl;
 }
 
 int scoreProposal(double car_s, double car_d, double car_speed,
@@ -147,9 +153,12 @@ int scoreProposal(double car_s, double car_d, double car_speed,
     << " s ahead " << s_ahead << " v ahead " << v_ahead
     << " s behind " << s_behind << " v behind " << v_behind << std::endl;
   proposed_speed = v_ahead;
-  if (check_behind && (v_behind-car_speed)*3.0>s_behind-10) {
+  if (check_behind && (v_behind-car_speed)*3.5>s_behind-10) {
     // make sure we have space of 3 seconds
     return -2;
+  }
+  if ((car_speed-v_ahead)*3.5 > s_ahead-10) {
+    return -1;
   }
   if (s_ahead >= 100 || (v_ahead >= car_speed && s_ahead>=50)) {
     return 2;

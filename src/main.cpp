@@ -200,9 +200,9 @@ int main() {
                   // evaluate crossing two lanes
                   tmp_score = scoreProposal(car_s,car_d,car_speed,track_len,2,true,sensor_fusion,tmp_target_lane_speed);
                   if (tmp_score>=0 && tmp_target_lane_speed>best_target_lane_speed && tmp_target_lane_speed>current_lane_speed+1) {
-                    best_score = tmp_score;
                     tmp_score = scoreProposal(car_s,car_d,car_speed,track_len,1,true,sensor_fusion,tmp_target_lane_speed);
                     if (tmp_score >= 0) {
+                      best_score = tmp_score;
                       best_target_lane_speed = tmp_target_lane_speed;
                       best_lane = 1;
                       target_lane = best_lane;
@@ -214,9 +214,9 @@ int main() {
                   // evaluate crossing two lanes
                   tmp_score = scoreProposal(car_s,car_d,car_speed,track_len,0,true,sensor_fusion,tmp_target_lane_speed);
                   if (tmp_score>=0 && tmp_target_lane_speed>best_target_lane_speed && tmp_target_lane_speed>current_lane_speed+1) {
-                    best_score = tmp_score;
                     tmp_score = scoreProposal(car_s,car_d,car_speed,track_len,1,true,sensor_fusion,tmp_target_lane_speed);
                     if (tmp_score >= 0) {
+                      best_score = tmp_score;
                       best_target_lane_speed = tmp_target_lane_speed;
                       best_lane = 1;
                       target_lane = best_lane;
