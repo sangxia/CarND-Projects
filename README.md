@@ -40,3 +40,11 @@
   Drive a car around a track in a simulator using Model Predictive Control and 
   reference waypoint information.
 
+* [Path Planning](PathPlanning)
+
+  Drive on a highway in a simulator and navigate traffic.
+
+* [Semantic Segmentation](SemanticSegmentation)
+
+  Label road pixels in images, starting from a pretrained VGG network.
+
