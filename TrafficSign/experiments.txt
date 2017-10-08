@@ -1,0 +1,78 @@
+preprocessing: train data centering
+
+conv 5x5x3x18, pool2, conv3x3x18x36, pool2, fc 1024, fc 43, lr 0.001, 10 rounds, 0.821
+
+conv 5x5x3x18, pool2, conv5x5x18x36, pool2, fc 1024, fc 43, lr 0.001, 10 rounds, 0.785
+
+conv 3x3x3x18, pool2, conv3x3x18x36, pool2, fc 1024, fc 43, lr 0.001, 10 rounds, 0.823
+
+conv 3x3x3x18, conv 3x3x18x36, pool2, conv 3x3x36x72, pool2, fc 1024, fc 43, lr 0.001, 10 rounds, 0.823
+
+add another fc layer 2048->1024, 0.776
+
+init stddev 0.1 seems to be much better than others
+
+conv 3x3x3x18, pool2, conv3x3x18x36, pool2, dropout 0.9, fc 1024, dropout 0.9, fc 43, lr 0.001, 20 rounds, 0.861
+
+conv 3x3x3x18, pool2, conv3x3x18x36, pool2, dropout 0.5, fc 1024, dropout 0.5, fc 43, lr 0.001, 20 rounds, 0.887
+
+conv 3x3x3x18, pool2, conv3x3x18x36, pool2, dropout 0.5, fc 2048, dropout 0.5, fc 1024, dropout 0.5, fc 43, lr 0.001, 30 rounds, 0.918, init stddev 0.08 (larger won't train)
+
+conv 3x3x3x18, pool2, conv3x3x18x36, pool2, dropout 0.5, fc 2048, dropout 0.5, fc 1024, dropout 0.5, fc 43, lr 0.001, 30 rounds, 0.934, l2 beta 0.001, init stddev 0.08
+
+conv 3x3x3x18, pool2, conv3x3x18x36, pool2, dropout 0.5, fc 2048, dropout 0.5, fc 1024, dropout 0.5, fc 43, lr 0.001, 30 rounds, 0.884, l2 beta 0.01, init stddev 0.08
+
+conv 3x3x3x18, pool2, conv3x3x18x36, pool2, dropout 0.5, fc 2048, dropout 0.5, fc 1024, dropout 0.5, fc 43, lr 0.001, 30 rounds, 0.930, l2 beta 0.0001, init stddev 0.08
+
+tried to add another conv, not good
+
+changed first max pool to avg pool, not much diff, 0.927, using avg on second pool, also not much diff
+
+tried to reduce first channel to 8, and subsequent to 16, performance dropped, increasing to 24 seems to be about the same level 0.93
+
+added some simple brightness adjustment, didn't help
+
+replaced previous centering with per image standardization
+
+conv 3x3x3x16, pool2, conv3x3x18x32, pool2, dropout 0.5, fc 1024, dropout 0.5, fc 43, lr 0.001, 23 rounds, 0.942, l2 beta 0.0001, init stddev 0.08
+
+conv 5x5x3x16, pool2, conv5x5x18x32, pool2, dropout 0.5, fc 1024, dropout 0.5, fc 43, lr 0.001, 30 rounds, 0.945, l2 beta 0.0001, init stddev 0.08. seems more stable than 3x3 filters
+
+clipping to -1/1 resulted in worse models
+
+had a look at value distribution, decided to clip to -5/5, got 0.954
+
+lowering dropout to 0.4 wasn't better
+
+rotate std pi/36, conv 5x5x3x16, pool2, conv5x5x18x32, pool2, dropout 0.5, fc 1024, dropout 0.5, fc 43, lr 0.001, 30 rounds, 0.945, l2 beta 0.0001, init stddev 0.08. 
+
+rotate pi/18 about okay, more rotation not better
+
+things got a lot worse with shifts, even without rotation, like in 0.92 range, although tuning dropout seems to help. suspect was because the dtype of shift was float. got 0.946 with 1 shift, 2 shift not good (even with different dropout rates)
+
+added zoom and varying dropout rate, still about 0.93
+
+shift range 1, no zoom no rotate, dropout 1-10 0.9 11-30 0.5, round 30 0.95
+
+shift range 1, no zoom, rotate pi/36, dropout 1-10 0.9 11-30 0.5, round 30 0.951
+
+same setting, clip 7.5, can potentially get close to 0.96
+
+changed initdev to 0.05, got 0.96, init 0.03 slightly worse
+
+init 0.05, dropout 1-10 0.5 11-30 0.5, round 30 0.962
+
+conv 5-16, conv 5-32, pool, conv 5-64, pool, dropout, full 1024, dropout, full, init 0.05, clip 7.5, dropout 0.5, round 30 0.976
+
+removed bias in the last full layer, might help. unclear
+
+conv 5-16, conv 5-32, pool, conv 5-64, pool, dropout, full 1024, dropout, full, init 0.05, clip 7.5, dropout 0.5@10/0.4, round 30 0.977
+
+conv 5-16, conv 5-32, pool, conv 5-64, pool, dropout, full 1024, dropout, full, init 0.05, clip 7.5, dropout 0.5@10/0.2, round 30 0.986
+
+later dropout 0.1 seems too aggressive
+
+[conv 5-16, conv 3-8] conv 5-48, pool, conv 5-96, pool, dropout, fc 1024, dropout, fc 43, init 0.04, clip 7.5, do 0.5@10/0.2, round 30, 0.98 (stays more stably at 0.98)
+
+[conv 5-16, conv 3-8] conv 5-48, pool, conv 3-96, pool, dropout, fc 1024, dropout, fc 43, init 0.04, clip 7.5, do 0.5@10/0.2, round 30, 0.98, batch 1024, class [16,40,41] batch 32
+
