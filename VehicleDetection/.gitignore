@@ -1,0 +1,7 @@
+.ipynb_checkpoints/
+*.npy
+*.pickle
+*.swp
+dataset/
+__pycache__/
+
