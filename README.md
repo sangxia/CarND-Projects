@@ -1,50 +1,54 @@
-* [Lane Line Detection](LaneLines) 
+* [Capstone Project](https://github.com/EuROS-SDC17/Waypoint_Navigation)
 
-  Find lane lines from images and videos. Python and OpenCV.
+  Traffic light detection, waypoint following, ROS control.
 
-* [Traffic Sign Classification](TrafficSign) 
+* [Semantic Segmentation](SemanticSegmentation)
 
-  Classify traffic signs. TensorFlow.
+  Label road pixels in images, starting from a pretrained VGG network.
 
-* [Behavioral Cloning](BehavioralCloning) 
+* [Path Planning](PathPlanning)
 
-  Behavioral cloning using camera images. Keras and TensorFlow.
-
-* [Advanced Lane Line Detection](AdvancedLaneLines) 
-
-  More sophisticated lane line detection. Python and OpenCV.
-
-* [Vehicle Detection](VehicleDetection) 
-
-  Detect vehicles in images and videos using histogram and HOG features. 
-  Python, OpenCV, sklearn, skimage.
-
-* [Extended Kalman Filter](EKF)
-
-  Sensor fusion using Extended Kalman Filter.
-
-* [Unscented Kalman Filter](UKF)
-
-  Sensor fusion using Unscented Kalman Filter.
-
-* [Kidnapped Vehicle](PF)
-
-  Localization using Particle Filter.
-
-* [PID Control](PID)
-
-  Drive a car around a track in a simulator using PID on CTE feedback.
+  Drive on a highway in a simulator and navigate traffic.
 
 * [MPC Control](MPC)
 
   Drive a car around a track in a simulator using Model Predictive Control and 
   reference waypoint information.
 
-* [Path Planning](PathPlanning)
+* [PID Control](PID)
 
-  Drive on a highway in a simulator and navigate traffic.
+  Drive a car around a track in a simulator using PID on CTE feedback.
 
-* [Semantic Segmentation](SemanticSegmentation)
+* [Kidnapped Vehicle](PF)
 
-  Label road pixels in images, starting from a pretrained VGG network.
+  Localization using Particle Filter.
+
+* [Unscented Kalman Filter](UKF)
+
+  Sensor fusion using Unscented Kalman Filter.
+
+* [Extended Kalman Filter](EKF)
+
+  Sensor fusion using Extended Kalman Filter.
+
+* [Vehicle Detection](VehicleDetection) 
+
+  Detect vehicles in images and videos using histogram and HOG features. 
+  Python, OpenCV, sklearn, skimage.
+
+* [Advanced Lane Line Detection](AdvancedLaneLines) 
+
+  More sophisticated lane line detection. Python and OpenCV.
+
+* [Behavioral Cloning](BehavioralCloning) 
+
+  Behavioral cloning using camera images. Keras and TensorFlow.
+
+* [Traffic Sign Classification](TrafficSign) 
+
+  Classify traffic signs. TensorFlow.
+
+* [Lane Line Detection](LaneLines) 
+
+  Find lane lines from images and videos. Python and OpenCV.
 
