@@ -31,4 +31,12 @@
 
   Localization using Particle Filter.
 
+* [PID Control](PID)
+
+  Drive a car around a track in a simulator using PID on CTE feedback.
+
+* [MPC Control](MPC)
+
+  Drive a car around a track in a simulator using Model Predictive Control and 
+  reference waypoint information.
 
